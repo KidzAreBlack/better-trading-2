@@ -10,7 +10,7 @@ export const SETTINGS = {
   'advanced-filtering': {label: 'Advanced filtering', defaultOn: false},
   'highlight-stat-filters': {label: 'Highlight searched mods', defaultOn: true},
   'default-non-unique': {label: 'Item rarity starts on Any Non-Unique', defaultOn: false},
-  'hover-open': {label: 'Open the hidden panel by hovering its icon', defaultOn: false},
+  'hover-open': {label: 'Show panel when hovering the icon', defaultOn: false},
   // "Enabled item result enhancers" on the About page
   'equivalent-pricings': {label: 'Equivalent pricings (powered by poe.ninja)', defaultOn: true},
   'maximum-sockets': {label: 'Warning for armors that cannot be 6-socketed', defaultOn: true},

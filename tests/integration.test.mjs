@@ -24,9 +24,9 @@ const PAGE = `<!doctype html><html><head><title>Trade - Path of Exile</title></h
   <div class="results"><div class="resultset">${row}${secondRow}<div class="row controls"><button class="btn load-more-btn"><span>Load More</span></button></div></div></div>
 </div></div></body></html>`;
 
-const load = async ({path = '/trade/search/Standard/abc123', settings = [], rarityValue = ''} = {}) => {
+const load = async ({path = '/trade/search/Standard/abc123', settings = [], rarityValue = '', script = '', local = {}} = {}) => {
   const store = {};
-  const dom = new JSDOM(PAGE, {url: `https://www.pathofexile.com${path}`, runScripts: 'outside-only', pretendToBeVisual: true});
+  const dom = new JSDOM(PAGE.replace('</body>', `${script}</body>`), {url: `https://www.pathofexile.com${path}`, runScripts: 'outside-only', pretendToBeVisual: true});
   const {window} = dom;
   window.chrome = {
     runtime: {getURL: (p) => `chrome-extension://test/${p}`, sendMessage: async () => null},
@@ -48,6 +48,7 @@ const load = async ({path = '/trade/search/Standard/abc123', settings = [], rari
   };
   window.TextEncoder = TextEncoder; // jsdom lacks these; browsers have them
   window.TextDecoder = TextDecoder;
+  Object.entries(local).forEach(([key, value]) => window.localStorage.setItem(key, value));
   settings.forEach((key) => window.localStorage.setItem(`bt-setting-${key}`, 'on'));
   // Stand-in for the site's own dropdown: clicking an option selects it.
   const rarity = window.document.querySelector('.search-advanced-pane.blue .filter-property:nth-of-type(2) input');
@@ -93,7 +94,7 @@ test('settings are off by default and turn features on', async () => {
   await sleep(50);
   const box = (label) => [...document.querySelectorAll('.bt-form-checkbox')].find((b) => b.textContent.trim() === label);
   const isChecked = (label) => box(label).querySelector('.bt-form-checkbox-indicator').classList.contains('is-active');
-  assert.deepEqual([...document.querySelectorAll('.bt-settings .bt-form-checkbox')].map((b) => b.textContent.trim()), ['Fuzzy search', 'Tier search', 'Highlight searched mods', 'Item rarity starts on Any Non-Unique', 'Open the hidden panel by hovering its icon']);
+  assert.deepEqual([...document.querySelectorAll('.bt-settings .bt-form-checkbox')].map((b) => b.textContent.trim()), ['Fuzzy search', 'Tier search', 'Highlight searched mods', 'Item rarity starts on Any Non-Unique', 'Show panel when hovering the icon']);
   assert.equal(isChecked('Highlight searched mods'), true);
   assert.equal(isChecked('Item rarity starts on Any Non-Unique'), false);
   assert.equal(isChecked('Fuzzy search'), false);
@@ -499,4 +500,34 @@ test('folder strings exported by the original Better Trading still import', asyn
   assert.deepEqual(folders.map((f) => f.title), ['test folder', 'test folder \u{1F5C1}', 'test PoE 1 folder \u{1F5C1}']);
   assert.deepEqual(store[`bookmark-trades--${folders[0].id}`].value[0].location, {version: '1', type: 'search', slug: 'owWJQEkil'});
   assert.equal(store[`bookmark-trades--${folders[2].id}`].value[0].location.slug, 'foobar');
+});
+
+test('every group in the stat filter list can be collapsed, and the choice is remembered', async () => {
+  const list = `<div class="filter-select-mutate"><ul>
+    <li class="multiselect__element"><span class="multiselect__option multiselect__option--disabled">Pseudo</span></li>
+    <li class="multiselect__element"><span class="multiselect__option"><span class="mutate-type mutate-type-pseudo">pseudo</span> +# total maximum Life</span></li>
+    <li class="multiselect__element"><span class="multiselect__option multiselect__option--disabled">Explicit</span></li>
+    <li class="multiselect__element"><span class="multiselect__option"><span class="mutate-type mutate-type-explicit">explicit</span> #% increased Spell Damage</span></li>
+  </ul></div>`;
+  const {document, window} = await load({script: list, local: {'bt-pseudo-collapsed': 'on'}});
+  const style = () => document.getElementById('bt-collapsed-stat-groups').textContent;
+  // The old "Pseudo collapsed" setting carries over.
+  assert.match(style(), /mutate-type-pseudo\) \{ display: none/);
+  assert.doesNotMatch(style(), /mutate-type-explicit/);
+
+  const explicitHeading = [...document.querySelectorAll('.multiselect__option--disabled')].find((h) => h.textContent === 'Explicit');
+  click(explicitHeading);
+  assert.match(style(), /mutate-type-explicit\) \{ display: none/);
+  assert.deepEqual(JSON.parse(window.localStorage.getItem('bt-collapsed-stat-groups')).sort(), ['explicit', 'pseudo']);
+
+  click(explicitHeading);
+  assert.doesNotMatch(style(), /mutate-type-explicit/);
+  assert.equal(window.localStorage.getItem('bt-pseudo-collapsed'), null);
+});
+
+test('the hover setting is labelled "Show panel when hovering the icon"', async () => {
+  const {document} = await load();
+  click([...document.querySelectorAll('.bt-root-page-menu-item')].find((tab) => tab.textContent.includes('Settings')));
+  await sleep(50);
+  assert.ok(document.body.textContent.includes('Show panel when hovering the icon'));
 });

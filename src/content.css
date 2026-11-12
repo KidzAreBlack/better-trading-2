@@ -451,15 +451,16 @@ div.row[bt-regroup-state='visible'] { background: rgba(16, 16, 16, 0.8) !importa
 .bt-tier-popup-ilvl { flex: 0 0 60px; color: var(--bt-gray-alt); }
 .bt-tier-popup-range { flex: 0 0 auto; min-width: 80px; text-align: right; font-weight: bold; color: var(--bt-white); }
 
-/* Collapsible "Pseudo" group in the "+ Add Stat Filter" list: arrow, heading and hint on one centred line */
-.filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li .mutate-type-pseudo) > .multiselect__option--disabled {
+/* Collapsible groups (Pseudo, Explicit, Implicit...) in the "+ Add Stat Filter" list: arrow, heading and hint
+   on one centred line. Which groups are hidden is set by src/features/collapsible-stat-groups.ts. */
+.filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li [class*="mutate-type-"]) > .multiselect__option--disabled {
   display: flex !important;
   align-items: center;
   gap: 6px;
   pointer-events: auto !important;
   cursor: pointer !important;
 }
-.filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li .mutate-type-pseudo) > .multiselect__option--disabled::before {
+.filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li [class*="mutate-type-"]) > .multiselect__option--disabled::before {
   content: '\25be';
   flex: 0 0 auto;
   width: 1em;
@@ -468,7 +469,7 @@ div.row[bt-regroup-state='visible'] { background: rgba(16, 16, 16, 0.8) !importa
   text-align: center;
   transform: translateY(-1px); /* the arrow glyph sits a little low */
 }
-.filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li .mutate-type-pseudo) > .multiselect__option--disabled::after {
+.filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li [class*="mutate-type-"]) > .multiselect__option--disabled::after {
   content: '(click to hide)' !important;
   position: static !important;
   flex: 0 0 auto;
@@ -481,6 +482,3 @@ div.row[bt-regroup-state='visible'] { background: rgba(16, 16, 16, 0.8) !importa
   transform: translateY(-2px) !important; /* small text sits low next to the heading; lift it to the row's centre */
   opacity: 0.6;
 }
-.bt-pseudo-collapsed .filter-select-mutate li.multiselect__element:has(.mutate-type-pseudo) { display: none !important; }
-.bt-pseudo-collapsed .filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li .mutate-type-pseudo) > .multiselect__option--disabled::before { content: '\25b8'; }
-.bt-pseudo-collapsed .filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li .mutate-type-pseudo) > .multiselect__option--disabled::after { content: '(hidden, click to show)' !important; }

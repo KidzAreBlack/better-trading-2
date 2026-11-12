@@ -21,7 +21,7 @@ Features:
   and grouping of identical listings.
 • Optional tools in Settings: fuzzy search, a tier picker for stat filters (PoE 1), result filtering by
   mod tier or name with Load all / Next 100, a default "Any Non-Unique" rarity, and opening the hidden
-  panel by hovering its icon.
+  panel when hovering its icon, and collapsible groups in the stat filter list.
 
 Everything is stored in your own browser. No tracking, analytics or ads.
 Source code: https://github.com/KidzAreBlack/better-trading-2

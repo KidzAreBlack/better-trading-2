@@ -2,7 +2,7 @@
 
 import {render} from 'preact';
 import {setupEnhancers} from './enhancers';
-import setupCollapsiblePseudo from './features/collapsible-pseudo';
+import setupCollapsibleStatGroups from './features/collapsible-stat-groups';
 import setupDefaultRarity from './features/default-rarity';
 import setupSidebarScroll from './features/sidebar-scroll';
 import fitTradePage from './features/fit-trade-page';
@@ -35,7 +35,7 @@ const start = () => {
   setupFuzzySearch();
   setupModFilter();
   setupTierPicker();
-  setupCollapsiblePseudo();
+  setupCollapsibleStatGroups();
   setupDefaultRarity();
   setupSidebarScroll();
   setupEnhancers();

@@ -23,8 +23,9 @@ single codebase. It keeps the original's look and adds a few search tools on top
     - **Advanced filtering**: a box that hides loaded results by mod tier or name (`p1`, `t2+`,
       `wizard`, `spell damage p2`), with **Load all** (the site shows up to 100 per search) and **Next 100** (continues from the last price).
   - **Item rarity starts on Any Non-Unique**.
-  - **Open the hidden panel by hovering its icon**.
-- **Collapsible Pseudo** group in the "+ Add Stat Filter" list.
+  - **Show panel when hovering the icon**.
+- **Collapsible groups** (Pseudo, Explicit, Implicit, Fractured…) in the "+ Add Stat Filter" list: click a
+  group's heading to hide or show it.
 - The trade page is resized to sit beside the sidebar instead of under it.
 
 ## Install
