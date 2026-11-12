@@ -1,0 +1,109 @@
+Better Trading 2 — licensing
+============================
+
+Better Trading 2 is an unofficial community rewrite of Better Trading
+(https://github.com/exile-center/better-trading). It is made of two parts,
+under two licenses:
+
+1. The new code written for Better Trading 2, and its own new icon and
+   store artwork (store/), are released into the public domain under
+   The Unlicense (Part 1 below).
+
+2. Everything carried over or adapted from the original Better Trading —
+   its icons and images, styles (CSS), wording, layout/design structure, and
+   code adapted from it (for example the bookmark storage and share-string
+   formats and the result enhancers) — remains under the original MIT License
+   of Exile Center (Part 2 below). That notice must be kept with any copy
+   that includes those parts.
+
+Bundled third-party components keep their own licenses (Part 3 below).
+
+
+-------------------------------------------------------------------------------
+Part 1 — The Unlicense (new Better Trading 2 code)
+-------------------------------------------------------------------------------
+
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or
+distribute this software, either in source code form or as a compiled
+binary, for any purpose, commercial or non-commercial, and by any
+means.
+
+In jurisdictions that recognize copyright laws, the author or authors
+of this software dedicate any and all copyright interest in the
+software to the public domain. We make this dedication for the benefit
+of the public at large and to the detriment of our heirs and
+successors. We intend this dedication to be an overt act of
+relinquishment in perpetuity of all present and future rights to this
+software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to <https://unlicense.org/>
+
+
+-------------------------------------------------------------------------------
+Part 2 — MIT License (parts derived from exile-center/better-trading)
+-------------------------------------------------------------------------------
+
+Applies to the icons, images, CSS, wording, design structure and adapted code
+retained from https://github.com/exile-center/better-trading
+(developed 2020-2023).
+The copyright line below is reproduced exactly as it appears in that
+project's LICENSE.md.
+
+MIT License
+
+Copyright (c) 2026 Exile Center
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+-------------------------------------------------------------------------------
+Part 3 — Bundled third-party components
+-------------------------------------------------------------------------------
+
+- Preact (bundled into content.js) — MIT License,
+  Copyright (c) 2015-present Jason Miller. https://github.com/preactjs/preact
+  (the MIT permission notice and disclaimer quoted in Part 2 apply to it,
+  with this copyright line)
+
+- Font Awesome Free 5 icons (SVG paths bundled into content.js) — icons
+  licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/),
+  code MIT. Copyright Fonticons, Inc. https://fontawesome.com/license/free
+
+- assets/images/bookmark-folder/ holds Path of Exile currency and
+  ascendancy artwork, carried over from Better Trading. This artwork is
+  owned by Grinding Gear Games; it is not covered by the licenses above and
+  is used only to illustrate bookmark folders.
+
+- assets/data/poe1-tiers.json is generated from RePoE data
+  (https://github.com/repoe-fork/repoe-fork.github.io), which is extracted
+  from Path of Exile game files. Path of Exile and its game data are
+  property of Grinding Gear Games.
+
+Better Trading 2 is not affiliated with or endorsed by Exile Center or
+Grinding Gear Games.

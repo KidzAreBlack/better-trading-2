@@ -1,0 +1,26 @@
+{
+  "name": "better-trading-2",
+  "version": "2.0.0",
+  "private": true,
+  "repository": {"type": "git", "url": "https://github.com/KidzAreBlack/better-trading-2.git"},
+  "engines": {"node": ">=18"},
+  "description": "Unofficial community rewrite of Better Trading for the Path of Exile trade site (Chrome and Firefox)",
+  "license": "(Unlicense AND MIT)",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --test-force-exit tests/*.test.mjs",
+    "package": "node build.mjs && node scripts/package.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "jsdom": "^25.0.0",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "@fortawesome/free-brands-svg-icons": "5.10.2",
+    "@fortawesome/free-solid-svg-icons": "5.12.1",
+    "preact": "^10.24.0"
+  }
+}
