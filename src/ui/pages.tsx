@@ -2,7 +2,7 @@ import {clearPinnedItems, getPinnedItems, unpinItem} from '../enhancers';
 import {useState} from 'preact/hooks';
 import {getHighlightColor, setHighlightColor} from '../lib/highlight-color';
 import {clearHistory, fetchHistory} from '../lib/history';
-import {ENHANCER_KEYS, isEnabled, setEnabled, SETTINGS, SETTINGS_TAB_KEYS} from '../lib/settings';
+import {isEnabled, setEnabled, SETTINGS, SETTINGS_SECTIONS} from '../lib/settings';
 import {tradeUrl} from '../lib/trade-location';
 import {sleep, timeAgo} from '../lib/util';
 import {AlertMessage, Button, Checkbox, flash, Mount, useLoaded, useTradeModeSlugs} from './common';
@@ -96,46 +96,42 @@ export function Settings() {
 
   return (
     <div class="bt-settings">
-      {SETTINGS_TAB_KEYS.map((key) => (
-        <div key={key} class="bt-settings-row">
-          <Checkbox label={SETTINGS[key].label} value={isEnabled(key)} onChange={(value) => setEnabled(key, value)} />
-          {key === 'tier-search' && isEnabled('tier-search') && (
-            <div class="bt-settings-sub-option">
-              <Checkbox label={SETTINGS['advanced-filtering'].label} value={isEnabled('advanced-filtering')} onChange={(value) => setEnabled('advanced-filtering', value)} />
+      {SETTINGS_SECTIONS.map((section) => (
+        <section key={section.title} class="bt-settings-section">
+          <h2 class="bt-settings-section-title">{section.title}</h2>
+          {section.keys.map((key) => (
+            <div key={key} class="bt-settings-row">
+              <Checkbox label={SETTINGS[key].label} value={isEnabled(key)} onChange={(value) => setEnabled(key, value)} />
+              {key === 'tier-search' && isEnabled('tier-search') && (
+                <div class="bt-settings-sub-option">
+                  <Checkbox label={SETTINGS['advanced-filtering'].label} value={isEnabled('advanced-filtering')} onChange={(value) => setEnabled('advanced-filtering', value)} />
+                </div>
+              )}
+              {key === 'highlight-stat-filters' && (
+                <input
+                  type="color"
+                  class="bt-settings-color"
+                  title="Highlight colour"
+                  value={color}
+                  onInput={(event) => {
+                    const value = (event.target as HTMLInputElement).value;
+                    setColor(value);
+                    setHighlightColor(value);
+                  }}
+                />
+              )}
             </div>
-          )}
-          {key === 'highlight-stat-filters' && (
-            <input
-              type="color"
-              class="bt-settings-color"
-              title="Highlight colour"
-              value={color}
-              onInput={(event) => {
-                const value = (event.target as HTMLInputElement).value;
-                setColor(value);
-                setHighlightColor(value);
-              }}
-            />
-          )}
-        </div>
+          ))}
+        </section>
       ))}
     </div>
   );
 }
 
 export function About() {
-  useLoaded(['settings-change'], () => Date.now(), 0);
-
   return (
     <>
       <div class="bt-about-sections">
-        <section class="bt-about-section">
-          <h1 class="bt-about-section-title">Enabled item result enhancers</h1>
-          {ENHANCER_KEYS.map((key) => (
-            <Checkbox key={key} class="bt-about-enhancer-checkbox" label={SETTINGS[key].label} value={isEnabled(key)} onChange={(value) => setEnabled(key, value)} />
-          ))}
-        </section>
-
         <section class="bt-about-section">
           <h1 class="bt-about-section-title">On GitHub</h1>
           <p class="bt-about-section-description">To contribute, report issues or simply browse the code.</p>

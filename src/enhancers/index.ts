@@ -1,14 +1,15 @@
 // Improvements added to each search result on the trade page: equivalent
 // prices, highlighted stats, socket warning, grouping of identical listings
-// and the Pin button.
+// the Pin button and the Plus / Minus buttons on each mod.
 
 import {fetchChaosRatios, type ChaosRatios} from '../lib/poe-ninja';
 import {getStats} from '../lib/search-panel';
 import {isEnabled} from '../lib/settings';
 import {currentLocation} from '../lib/trade-location';
 import {onPageChange} from '../lib/page-watch';
-import {emit, escapeRegex} from '../lib/util';
+import {emit, escapeRegex, on} from '../lib/util';
 import {parseItem, type ParsedItem} from './item';
+import {addModButtons, setupModButtons} from './mod-buttons';
 
 const UNENHANCED_ROWS = '.resultset > div.row[data-id]:not([bt-enhanced])';
 
@@ -226,7 +227,7 @@ const togglePin = (row: HTMLElement) => {
 
 const addPinButton = (row: HTMLElement) => {
   const buttons = row.querySelector('.details .btns');
-  if (!buttons) return;
+  if (!buttons || buttons.querySelector('.bt-pin-button')) return;
 
   const button = document.createElement('button');
   button.type = 'button';
@@ -286,6 +287,7 @@ const enhanceNewRows = async () => {
       if (isEnabled('maximum-sockets') && location.version === '1') addSocketWarning(row, item);
       if (isEnabled('regroup-similars')) regroupSimilar(row);
       addPinButton(row);
+      addModButtons(row);
     });
   } finally {
     isRunning = false;
@@ -297,7 +299,32 @@ const enhanceNewRows = async () => {
   }
 };
 
+// The result extras that a setting turns on or off. When one of them changes, results
+// already on the page are redone, so the change shows at once.
+const RESULT_SETTINGS = ['highlight-stat-filters', 'equivalent-pricings', 'maximum-sockets', 'regroup-similars'] as const;
+const resultSettingsState = () => RESULT_SETTINGS.map((key) => isEnabled(key)).join();
+
+const redoAllRows = () => {
+  document.querySelectorAll('.bt-equivalent-pricings, .bt-maximum-sockets, .bt-group-button').forEach((element) => element.remove());
+  document.querySelectorAll('.bt-highlight-stat-filters').forEach((element) => element.classList.remove('bt-highlight-stat-filters'));
+  document.querySelectorAll('.resultset > div.row[bt-enhanced]').forEach((row) => {
+    row.removeAttribute('bt-enhanced');
+    row.removeAttribute('bt-regroup-hash');
+    row.removeAttribute('bt-regroup-state');
+  });
+  void enhanceNewRows();
+};
+
 export const setupEnhancers = (): void => {
+  setupModButtons();
+
+  let lastState = resultSettingsState();
+  on('settings-change', () => {
+    const state = resultSettingsState();
+    if (state === lastState) return;
+    lastState = state;
+    redoAllRows();
+  });
   onPageChange(() => void enhanceNewRows());
   void enhanceNewRows();
 };

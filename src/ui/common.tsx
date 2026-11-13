@@ -1,6 +1,7 @@
 import type {ComponentChildren} from 'preact';
 import {useEffect, useRef, useState} from 'preact/hooks';
 import {assetUrl} from '../lib/ext';
+import {FOLDER_ICONS} from '../lib/bookmarks';
 import {currentTradeMode, withTradeMode} from '../lib/search-link';
 import type {TradeSiteVersion} from '../lib/trade-location';
 import {copyToClipboard, emit, on} from '../lib/util';
@@ -311,7 +312,9 @@ export function ContextualMenu(props: {class?: string; items: MenuItem[]}) {
 
 // ---- Folder icon and mounting of cloned page elements ---------------------------------
 
-const isItemIcon = (icon: string) => !/^(poe2-)?(slayer|gladiator|champion|assassin|saboteur|trickster|juggernaut|berserker|chieftain|necromancer|elementalist|occultist|deadeye|raider|pathfinder|guardian|hierophant|inquisitor|ascendant|titan|warbringer|smith-of-kitava|infernalist|blood-mage|lich|chronomancer|stormweaver|witch-hunter|gemling-legionnaire|tactician|invoker|acolyte-of-chayula|ritualist|amazon)$/.test(icon);
+// Currency and item icons are square; everything else is an ascendancy portrait.
+const ITEM_ICONS = new Set([...FOLDER_ICONS['1'].items, ...FOLDER_ICONS['2'].items]);
+const isItemIcon = (icon: string) => ITEM_ICONS.has(icon);
 
 export function BookmarkFolderIcon(props: {icon: string; class?: string}) {
   return (

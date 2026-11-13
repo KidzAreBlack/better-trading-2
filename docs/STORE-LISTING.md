@@ -21,6 +21,7 @@ Features:
 • History of the searches you run, and pinned items for comparing results.
 • Equivalent prices from poe.ninja (PoE 1), highlighting of the mods you searched for, a socket warning
   and grouping of identical listings.
+• + / − beside each result mod: add it to an And or Not stat group in your search with one click.
 • Optional tools in Settings: fuzzy search, a tier picker for stat filters (PoE 1), result filtering by
   mod tier or name with Load all / Next 100, a default "Any Non-Unique" rarity, and opening the hidden
   panel when hovering its icon, and collapsible stat filter groups.

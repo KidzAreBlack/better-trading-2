@@ -30,8 +30,6 @@ const start = () => {
   render(<App />, root);
 
   applyHighlightColor();
-  // Clear the setting left behind by the removed font size option.
-  try { window.localStorage.removeItem('bt-font-size'); } catch {}
   fitTradePage();
   setupFuzzySearch();
   setupModFilter();

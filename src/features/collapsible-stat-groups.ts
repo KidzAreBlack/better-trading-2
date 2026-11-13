@@ -13,7 +13,6 @@ import {on} from '../lib/util';
 // skip over hidden stats.
 
 const STORAGE_KEY = 'collapsed-stat-groups';
-const OLD_PSEUDO_KEY = 'pseudo-collapsed'; // setting from before every group could collapse
 const STYLE_ID = 'bt-collapsed-stat-groups';
 const STAT_SELECT_SELECTOR = '.filter-select-mutate';
 const MAX_SKIPS = 600;
@@ -80,12 +79,6 @@ const load = () => {
     if (Array.isArray(saved)) saved.forEach((group) => typeof group === 'string' && collapsed.add(group));
   } catch (_error) {
     // Unreadable setting: start with every group shown.
-  }
-
-  if (local.get(OLD_PSEUDO_KEY) === 'on') {
-    collapsed.add('pseudo');
-    local.set(OLD_PSEUDO_KEY, null);
-    save();
   }
 };
 

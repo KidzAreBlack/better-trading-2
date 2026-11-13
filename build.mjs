@@ -24,7 +24,11 @@ const baseManifest = {
   permissions: ['storage'],
   // Price data for the "equivalent prices" feature is fetched from poe.ninja by the background script.
   host_permissions: [NINJA_HOST, POBB_HOST],
-  content_scripts: [{matches: TRADE_MATCHES, js: ['content.js'], css: ['content.css'], run_at: 'document_idle'}],
+  content_scripts: [
+    {matches: TRADE_MATCHES, js: ['content.js'], css: ['content.css'], run_at: 'document_idle'},
+    // Runs in the page itself, to add stat filters to the site's search form (Plus / Minus on result mods).
+    {matches: TRADE_MATCHES, js: ['page.js'], run_at: 'document_idle', world: 'MAIN'},
+  ],
   web_accessible_resources: [{resources: ['assets/*'], matches: ['*://www.pathofexile.com/*']}],
 };
 
@@ -32,7 +36,7 @@ const manifests = {
   // Chrome, Edge, Brave, Opera, Vivaldi, Thorium...
   chrome: {
     ...baseManifest,
-    minimum_chrome_version: '110',
+    minimum_chrome_version: '111', // first version with page-world content scripts
     background: {service_worker: 'background.js'},
   },
   // Firefox runs Manifest V3 background code as a script (event page), not a service worker.
@@ -54,11 +58,11 @@ const manifests = {
 };
 
 const options = (target) => ({
-  entryPoints: {content: 'src/main.tsx', background: 'src/background.ts'},
+  entryPoints: {content: 'src/main.tsx', background: 'src/background.ts', page: 'src/page-world.ts'},
   outdir: `dist/${target}`,
   bundle: true,
   format: 'iife',
-  target: ['chrome110', 'firefox126'],
+  target: ['chrome111', 'firefox140'],
   jsx: 'automatic',
   jsxImportSource: 'preact',
   define: {__VERSION__: JSON.stringify(pkg.version)},

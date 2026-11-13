@@ -192,8 +192,18 @@ for variant_index, key in enumerate(variant_keys):
                 entry['w'] = [variant_index]
                 stats[text].append(entry)
 
-data = {'variants': [list(key) for key in variant_keys], 'stats': dict(sorted(stats.items()))}
+# Base type -> [class label, armour type], so the tier picker can tell the item type from the
+# main search box ("Hubris Circlet" -> Helmet, Energy Shield) when no Item Category is chosen.
+base_classes = {}
+for base in bases.values():
+    label = CLASSES.get(base.get('item_class'))
+    if not label or base.get('release_state') != 'released' or not base.get('name'):
+        continue
+    sub = next((name for tag, name in ARMOUR_TAGS.items() if tag in set(base['tags'])), '')
+    base_classes[base['name'].lower()] = [label, sub]
+
+data = {'variants': [list(key) for key in variant_keys], 'stats': dict(sorted(stats.items())), 'bases': dict(sorted(base_classes.items()))}
 body = json.dumps(data, separators=(',', ':'), ensure_ascii=False)
 with open(out, 'w') as handle:
     handle.write(body)
-print('mods', len(candidates), 'variants', len(variant_keys), 'stats', len(stats), 'bytes', len(body))
+print('mods', len(candidates), 'variants', len(variant_keys), 'stats', len(stats), 'bases', len(base_classes), 'bytes', len(body))

@@ -1,8 +1,8 @@
 import {useEffect, useRef, useState} from 'preact/hooks';
 import {assetUrl, local} from '../lib/ext';
-import {isAdvancedFilteringOn, isEnabled} from '../lib/settings';
+import {isEnabled} from '../lib/settings';
 import {Bookmarks} from './Bookmarks';
-import {FlashMessages, useLoaded} from './common';
+import {FlashMessages} from './common';
 import {FaIcon, type IconName} from './icons';
 import {About, History, PinnedItems, Settings} from './pages';
 

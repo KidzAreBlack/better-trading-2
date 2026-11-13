@@ -391,8 +391,10 @@ export const searchSlug = async (query: Json): Promise<string> =>
 
 const folderIcon = (version: TradeSiteVersion, ascendancy: string): string | null => {
   if (!ascendancy) return null;
-  const name = (version === '2' ? 'poe2-' : '') + ascendancy.toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-|-$/g, '');
-  return FOLDER_ICONS[version].ascendancies.some((group) => group.includes(name)) ? name : null;
+  // Compared without hyphens, so "Witchhunter" finds the "witch-hunter" icon.
+  const key = ascendancy.toLowerCase().replace(/[^a-z]+/g, '');
+  const icons = FOLDER_ICONS[version].ascendancies.flat();
+  return icons.find((icon) => icon.replace(/^poe2-/, '').replace(/-/g, '') === key) || null;
 };
 
 export interface ImportedBuild {

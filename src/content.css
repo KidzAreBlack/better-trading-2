@@ -330,7 +330,9 @@ body.bt-is-collapsed.bt-is-peeking .bt-header-expand-button.is-visible { opacity
 .bt-pinned-item-wrapper .price br, .bt-pinned-item-wrapper .price .currency-text span, .bt-pinned-item-wrapper .price .price-label { display: none; }
 
 /* Settings and About */
-.bt-settings { display: grid; grid-gap: 10px; padding: 5px 0; }
+.bt-settings { display: grid; grid-gap: 14px; padding: 5px 0; }
+.bt-settings-section { display: grid; grid-gap: 10px; }
+.bt-settings-section-title { margin: 0; font-family: var(--bt-font); font-size: 15px; letter-spacing: 0.5px; color: var(--bt-beige); }
 .bt-settings-row { display: flex; flex-wrap: wrap; align-items: center; }
 .bt-settings-sub-option { flex: 0 0 100%; padding-left: 20px; margin-top: 10px; }
 .bt-settings-color { width: 28px; height: 20px; padding: 0; border: 1px solid #634928; margin-left: 10px; background: none; cursor: pointer; }
@@ -341,8 +343,6 @@ body.bt-is-collapsed.bt-is-peeking .bt-header-expand-button.is-visible { opacity
 .bt-about-disclaimer { margin: 30px 0 0; text-align: center; font-style: italic; }
 .bt-about-version { margin-top: 15px; text-align: center; }
 .bt-about-version::before { content: 'v'; }
-.bt-about-enhancer-checkbox { margin: 0; }
-.bt-about-enhancer-checkbox + .bt-about-enhancer-checkbox { margin-top: 10px; }
 
 /* Tier search box */
 .bt-mod-filter { margin-bottom: 0; } /* same 5px gap above the folders as without the filter */
@@ -485,3 +485,16 @@ div.row[bt-regroup-state='visible'] { background: rgba(16, 16, 16, 0.8) !importa
   transform: translateY(-2px) !important; /* small text sits low next to the heading; lift it to the row's centre */
   opacity: 0.6;
 }
+
+/* Plus / Minus on result mods: shown on hover, just left of the mod text, without moving it. */
+.bt-mod-buttons { display: none; position: relative; width: 0; height: 1em; vertical-align: middle; }
+.bt-mod-buttons-on .bt-mod-buttons { display: inline-block; }
+.bt-mod-buttons-inner { display: none; position: absolute; right: 5px; top: 50%; transform: translateY(-50%); gap: 3px; z-index: 2; }
+.bt-mod-buttons-on .item-mod:hover .bt-mod-buttons-inner { display: flex; }
+.bt-mod-button {
+  width: 14px; height: 14px; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.5);
+  color: #fff; font: bold 11px/12px Arial, sans-serif; text-align: center; cursor: pointer;
+}
+.bt-mod-button-and { background: #2f7a32; }
+.bt-mod-button-not { background: #8a2020; }
+.bt-mod-button:hover { border-color: #fff; filter: brightness(1.25); }

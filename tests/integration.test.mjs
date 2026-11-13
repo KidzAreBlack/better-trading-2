@@ -98,7 +98,13 @@ test('settings are off by default and turn features on', async () => {
   await sleep(50);
   const box = (label) => [...document.querySelectorAll('.bt-form-checkbox')].find((b) => b.textContent.trim() === label);
   const isChecked = (label) => box(label).querySelector('.bt-form-checkbox-indicator').classList.contains('is-active');
-  assert.deepEqual([...document.querySelectorAll('.bt-settings .bt-form-checkbox')].map((b) => b.textContent.trim()), ['Fuzzy search', 'Tier search', 'Highlight searched mods', 'Stat filters are collapsible', 'Item rarity starts on Any Non-Unique', 'Show panel when hovering the icon']);
+  assert.deepEqual([...document.querySelectorAll('.bt-settings-section-title')].map((h) => h.textContent), ['Search form', 'Results', 'Panel']);
+  assert.deepEqual([...document.querySelectorAll('.bt-settings .bt-form-checkbox')].map((b) => b.textContent.trim()), [
+    'Fuzzy search', 'Tier search', 'Stat filters are collapsible', 'Item rarity starts on Any Non-Unique',
+    'Highlight searched mods', 'Plus / Minus buttons on result mods', 'Equivalent prices (from poe.ninja)',
+    'Warning for body armours that cannot be 6-socketed', 'Group identical listings from the same seller',
+    'Show panel when hovering the icon',
+  ]);
   assert.equal(isChecked('Highlight searched mods'), true);
   assert.equal(isChecked('Item rarity starts on Any Non-Unique'), false);
   assert.equal(isChecked('Fuzzy search'), false);
@@ -146,6 +152,42 @@ test('tier picker fills the min box for the selected item category', async () =>
   assert.match(first.textContent, /T1Runicilvl 84175–200/);
   click(first);
   assert.equal(document.querySelector('.search-advanced-pane.brown input.minmax').value, '175');
+});
+
+test('with Item Category blank, the tier picker uses the item named in the search box', async () => {
+  const {document} = await load({settings: ['tier-search']});
+  document.querySelector('.search-advanced-pane.blue .filter-property input').value = 'Any'; // how the site shows no Item Category
+  const searchBox = document.querySelector('.search-bar .search-left input');
+  const open = () => {
+    document.getElementById('bt-tier-popup')?.remove();
+    document.querySelectorAll('.bt-tier-button.is-open').forEach((b) => b.classList.remove('is-open'));
+    click(document.querySelector('.bt-tier-button'));
+    return document.getElementById('bt-tier-popup');
+  };
+
+  // A base type in the search box (here inside a longer name) sets the item type.
+  searchBox.value = "Some Unique Imperial Staff";
+  let popup = open();
+  assert.match(popup.textContent, /Item type from the search box: Imperial Staff \(Staff\)/);
+  assert.match(popup.querySelector('.bt-tier-popup-section').textContent, /Prefix · Staff/);
+  assert.match(popup.querySelector('.bt-tier-popup-row').textContent, /T1Runicilvl 84175–200/);
+
+  // A jewel: only jewel tiers, not every item type's.
+  searchBox.value = 'Crimson Jewel';
+  popup = open();
+  assert.match(popup.textContent, /Item type from the search box: Crimson Jewel \(Jewel\)/);
+
+  // A plain word works too.
+  searchBox.value = 'staff';
+  popup = open();
+  assert.match(popup.textContent, /Item type from the search box: Staff\./);
+  assert.match(popup.querySelector('.bt-tier-popup-section').textContent, /Prefix · Staff/);
+
+  // Nothing recognisable: every item type, with the usual hint to pick a category.
+  searchBox.value = '';
+  popup = open();
+  assert.doesNotMatch(popup.textContent, /from the search box/);
+  assert.match(popup.textContent, /Pick an Item Category/);
 });
 
 test('picking a tier also filters the loaded results, and the two stay in step', async () => {
@@ -513,9 +555,9 @@ test('every group in the stat filter list can be collapsed, and the choice is re
     <li class="multiselect__element"><span class="multiselect__option multiselect__option--disabled">Explicit</span></li>
     <li class="multiselect__element"><span class="multiselect__option"><span class="mutate-type mutate-type-explicit">explicit</span> #% increased Spell Damage</span></li>
   </ul></div>`;
-  const {document, window} = await load({script: list, local: {'bt-pseudo-collapsed': 'on'}, settings: ['collapsible-stat-groups']});
+  const {document, window} = await load({script: list, local: {'bt-collapsed-stat-groups': '["pseudo"]'}, settings: ['collapsible-stat-groups']});
   const style = () => document.getElementById('bt-collapsed-stat-groups').textContent;
-  // The old "Pseudo collapsed" setting carries over.
+  // Hidden groups are remembered.
   assert.match(style(), /mutate-type-pseudo\) \{ display: none/);
   assert.doesNotMatch(style(), /mutate-type-explicit/);
 
@@ -526,7 +568,6 @@ test('every group in the stat filter list can be collapsed, and the choice is re
 
   click(explicitHeading);
   assert.doesNotMatch(style(), /mutate-type-explicit/);
-  assert.equal(window.localStorage.getItem('bt-pseudo-collapsed'), null);
 });
 
 test('the hover setting is labelled "Show panel when hovering the icon"', async () => {
@@ -810,4 +851,112 @@ test('bookmarks are saved without the trade mode and open in the mode you are us
   const saved = store['bookmark-trades--f1'].value.find((t) => t.id !== 't1');
   assert.deepEqual(decodeSlug(saved.location.slug), LIFE_SEARCH);
   void store;
+});
+
+test('Plus and Minus on result mods add the mod to an And group and a Not group', async () => {
+  const {window, document} = await load();
+  // Stand-in for the site's search form state, which the page script edits.
+  window.app = {state: {stats: [{type: 'and', filters: []}]}};
+  window.eval(readFileSync(new URL('../dist/chrome/page.js', import.meta.url), 'utf8'));
+
+  const field = document.querySelector('.resultset > div.row [data-field="stat.explicit.stat_2974417149"]');
+  assert.ok(document.body.classList.contains('bt-mod-buttons-on'));
+  const [plus, minus] = field.querySelectorAll('.bt-mod-button');
+  assert.equal(plus.textContent, '+');
+  assert.equal(minus.textContent, '−');
+  // The mod text is unchanged by the buttons.
+  assert.equal(field.textContent.replace(/[+−]/g, '').trim(), '16% increased Spell Damage');
+
+  click(plus);
+  await sleep(50);
+  const stats = () => JSON.parse(JSON.stringify(window.app.state.stats));
+  assert.deepEqual(stats(), [
+    {type: 'and', filters: []},
+    {type: 'and', filters: [{id: 'explicit.stat_2974417149', value: {}, disabled: false}]},
+  ]);
+  assert.match(document.querySelector('.bt-flash-messages').textContent, /Added to the And group: 16% increased Spell Damage/);
+
+  click(plus); // already there
+  await sleep(50);
+  assert.equal(stats()[1].filters.length, 1);
+  assert.match(document.querySelector('.bt-flash-messages').textContent, /Already in the And group/);
+
+  const other = document.querySelector('.resultset > div.row [data-field="stat.implicit.stat_2885144362"]');
+  click(other.querySelector('.bt-mod-button-and'));
+  click(other.querySelector('.bt-mod-button-not'));
+  await sleep(50);
+  assert.deepEqual(stats()[1].filters.map((f) => f.id), ['explicit.stat_2974417149', 'implicit.stat_2885144362']);
+  assert.deepEqual(stats()[2], {type: 'not', filters: [{id: 'implicit.stat_2885144362', value: {}, disabled: false}]});
+});
+
+test('Plus / Minus buttons can be turned off in Settings', async () => {
+  const {document} = await load();
+  assert.ok(document.body.classList.contains('bt-mod-buttons-on'));
+  click(tab(document, 'Settings'));
+  await sleep(50);
+  const option = [...document.querySelectorAll('.bt-settings .bt-form-checkbox')].find((c) => c.textContent.trim() === 'Plus / Minus buttons on result mods');
+  assert.ok(option, 'option is in the Settings tab');
+  click(option);
+  await sleep(50);
+  assert.ok(!document.body.classList.contains('bt-mod-buttons-on'));
+});
+
+test('About has no settings; every result option in Settings turns on and off at once', async () => {
+  const ninja = {lines: [{currencyTypeName: 'Chaos Orb', chaosEquivalent: 1}, {currencyTypeName: 'Divine Orb', chaosEquivalent: 150}]};
+  const {window, document} = await load({onMessage: (message) => (message.query === 'poe-ninja' ? ninja : null)});
+
+  // About: only things about the extension.
+  const aboutButton = [...document.querySelectorAll('a.bt-header-button')].pop();
+  click(aboutButton);
+  await sleep(50);
+  assert.ok(document.querySelector('.bt-about-sections'), 'About is open');
+  assert.equal(document.querySelectorAll('.bt-about-sections .bt-form-checkbox').length, 0);
+  click(aboutButton);
+  await sleep(50);
+
+  // Make the first result a 3-socket body armour at item level 30 (can have 4 sockets: warning).
+  const first = document.querySelector('.resultset > div.row[data-id]');
+  first.querySelector('.icon img').src = 'https://web.poecdn.com/image/Art/2DItems/Armours/BodyArmours/BodyStr1.png';
+  first.querySelector('[data-field="ilvl"] span:last-child').textContent = '30';
+
+  click(tab(document, 'Settings'));
+  await sleep(50);
+  const box = (label) => [...document.querySelectorAll('.bt-settings .bt-form-checkbox')].find((b) => b.textContent.trim() === label);
+  const toggle = async (label) => {
+    click(box(label));
+    await sleep(100);
+  };
+  const count = (selector) => document.querySelectorAll(selector).length;
+
+  // Settled state after load (the socket change above shows once results are redone).
+  assert.ok(count('.bt-equivalent-pricings') > 0, 'equivalent prices shown');
+  assert.ok(count('.item-mod.bt-highlight-stat-filters') > 0, 'searched mods highlighted');
+  assert.equal(count('.bt-group-button'), 1, 'identical listings grouped');
+
+  await toggle('Equivalent prices (from poe.ninja)');
+  assert.equal(count('.bt-equivalent-pricings'), 0);
+  assert.equal(count('.bt-maximum-sockets'), 1, 'redoing the results also picked up the socket warning');
+  await toggle('Equivalent prices (from poe.ninja)');
+  assert.ok(count('.bt-equivalent-pricings') > 0);
+
+  await toggle('Warning for body armours that cannot be 6-socketed');
+  assert.equal(count('.bt-maximum-sockets'), 0);
+  await toggle('Warning for body armours that cannot be 6-socketed');
+  assert.equal(document.querySelector('.bt-maximum-sockets').textContent, 'Max. 4 sockets');
+
+  await toggle('Highlight searched mods');
+  assert.equal(count('.item-mod.bt-highlight-stat-filters'), 0);
+  await toggle('Highlight searched mods');
+  assert.ok(count('.item-mod.bt-highlight-stat-filters') > 0);
+
+  await toggle('Group identical listings from the same seller');
+  assert.equal(count('.bt-group-button'), 0);
+  assert.equal(count('div.row[bt-regroup-state="hidden"]'), 0, 'the hidden copy shows again');
+  await toggle('Group identical listings from the same seller');
+  assert.equal(count('.bt-group-button'), 1);
+
+  // Redoing never doubles the buttons on a result.
+  assert.equal(first.querySelectorAll('.bt-pin-button').length, 1);
+  assert.equal(first.querySelectorAll('.bt-mod-buttons').length, first.querySelectorAll('.item-mod [data-field^="stat."]').length);
+  window.close();
 });

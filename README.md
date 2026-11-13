@@ -23,11 +23,14 @@ single codebase. It keeps the original's look and adds a few search tools on top
   site's search limit.
 - **History** of the searches you run, shown as plain text, and **pinned items** for comparing results.
 - **Result extras**: equivalent prices from poe.ninja (PoE 1), **highlight searched mods** (a setting, with a
-  colour picker), body-armour socket warning, grouping of identical listings.
+  colour picker), body-armour socket warning, grouping of identical listings, and **+ / −** beside each mod
+  (on hover): **+** adds the mod to an **And** stat group in your search, **−** to a **Not** group (each group is
+  made the first time, then reused). Click Search when ready. Turned on or off in Settings ("Plus / Minus buttons on result mods").
 - **Settings tab** (each one can be turned on or off):
   - **Fuzzy search**: adds `~` as you type in the main search box and stat filter boxes.
   - **Tier search**: a **T** button on each stat filter that lists the mod's tiers for the selected Item
-    Category and fills in the min value (PoE 1).
+    Category and fills in the min value (PoE 1). With Item Category set to Any, it uses the item named in the
+    main search box (a base type such as "Hubris Circlet", or a word like "ring").
     - **Advanced filtering**: a box that hides loaded results by mod tier or name (`p1`, `t2+`,
       `wizard`, `spell damage p2`), with **Load all** (the site shows up to 100 per search) and **Next 100** (continues from the last price).
   - **Stat filters are collapsible**: click a group's heading (Pseudo, Explicit, Implicit, Fractured…) in the

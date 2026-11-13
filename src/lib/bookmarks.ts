@@ -30,6 +30,8 @@ const TRADES_KEY = 'bookmark-trades';
 const EXPANSION_KEY = 'bookmark-folders-expansion';
 
 // Icons offered for folders: currency/item icons, and ascendancies grouped by class.
+// Ascendancy portraits are the PoE wikis' avatar images (Grinding Gear Games art). Raider (replaced by
+// Warden in 3.25) is no longer offered, but its image is kept so existing folders still show it.
 export const FOLDER_ICONS: Record<TradeSiteVersion, {items: string[]; ascendancies: string[][]}> = {
   '1': {
     items: ['alchemy', 'chaos', 'exalt', 'divine', 'mirror', 'card', 'essence', 'fossil', 'map', 'scarab'],
@@ -38,9 +40,9 @@ export const FOLDER_ICONS: Record<TradeSiteVersion, {items: string[]; ascendanci
       ['assassin', 'saboteur', 'trickster'],
       ['juggernaut', 'berserker', 'chieftain'],
       ['necromancer', 'elementalist', 'occultist'],
-      ['deadeye', 'raider', 'pathfinder'],
+      ['deadeye', 'warden', 'pathfinder'],
       ['guardian', 'hierophant', 'inquisitor'],
-      ['ascendant'],
+      ['ascendant', 'reliquarian', 'luminary'],
     ],
   },
   '2': {
@@ -51,12 +53,13 @@ export const FOLDER_ICONS: Record<TradeSiteVersion, {items: string[]; ascendanci
     ],
     ascendancies: [
       ['poe2-titan', 'poe2-warbringer', 'poe2-smith-of-kitava'],
-      ['poe2-chronomancer', 'poe2-stormweaver'],
+      ['poe2-chronomancer', 'poe2-stormweaver', 'poe2-disciple-of-varashta'],
       ['poe2-deadeye', 'poe2-pathfinder'],
-      ['poe2-ritualist', 'poe2-amazon'],
-      ['poe2-invoker', 'poe2-acolyte-of-chayula'],
+      ['poe2-ritualist', 'poe2-amazon', 'poe2-spirit-walker'],
+      ['poe2-invoker', 'poe2-acolyte-of-chayula', 'poe2-martial-artist'],
       ['poe2-witch-hunter', 'poe2-gemling-legionnaire', 'poe2-tactician'],
       ['poe2-infernalist', 'poe2-blood-mage', 'poe2-lich'],
+      ['poe2-oracle', 'poe2-shaman'],
     ],
   },
 };

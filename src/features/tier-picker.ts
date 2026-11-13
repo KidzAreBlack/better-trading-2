@@ -1,12 +1,14 @@
 // Tier picker: adds a "T" button to each stat filter row of the search. It
 // opens a list of that mod's tiers (name, item level, roll range) for the
-// selected Item Category; clicking a tier puts its lowest roll in the "min" box.
+// selected Item Category (or, when it is Any, the item named in the main search box);
+// clicking a tier puts its lowest roll in the "min" box.
 //
 // The tier table (assets/data/poe1-tiers.json) is generated from RePoE game data by
 // scripts/build-tier-data.py. Path of Exile 1 only for now.
 
 import {assetUrl} from '../lib/ext';
 import {onPageChange} from '../lib/page-watch';
+import {getCategory, getName} from '../lib/search-panel';
 import {isAdvancedFilteringOn, isEnabled} from '../lib/settings';
 import {getModFilterQuery, setModFilterQuery} from './mod-filter';
 import {on, setInputValue} from '../lib/util';
@@ -23,6 +25,7 @@ interface Family {
 interface TierData {
   variants: [string, string, string][]; // item class, sub type (armour kind), influence
   stats: {[text: string]: Family[]};
+  bases?: {[baseName: string]: [string, string]}; // lower-case base type -> [item class, armour kind]
 }
 
 // The tier table is about 0.2 MB, so it is only loaded once Tier search is used.
@@ -46,8 +49,6 @@ const loadData = () => {
 };
 const BUTTON_CLASS = 'bt-tier-button';
 const POPUP_ID = 'bt-tier-popup';
-const CATEGORY_INPUT_SELECTOR =
-  '.search-advanced-items .filter-group:nth-of-type(1) .filter-property:nth-of-type(1) input';
 const SKIPPED_MUTATE_TYPES = /pseudo|implicit|enchant|crafted|scourge|veiled|monster|delve|ultimatum|sanctum/i;
 
 let scheduled = false;
@@ -76,14 +77,65 @@ export const readStatText = (row: Element): string | null => {
   return normalize(clone.textContent || '');
 };
 
-export const readCategory = (): string => {
-  const input = document.querySelector(CATEGORY_INPUT_SELECTOR) as HTMLInputElement | null;
-  const value = input ? input.value || '' : '';
-
-  return value
+// Item Category shows "Any" when nothing is picked, and "Any Armour" for a whole group.
+const readCategory = (): string =>
+  (getCategory() || '')
     .toLowerCase()
-    .replace(/^any\s+/, '')
+    .replace(/^any\b\s*/, '')
     .trim();
+
+// When Item Category is Any, the main search box usually still says what the item is:
+// a base type ("Hubris Circlet", "Kaom's Heart Glorious Plate", "spine bow") or a word
+// like "ring" or "bow".
+const MAX_BASE_WORDS = 5;
+const CLASS_WORDS: [RegExp, string][] = [
+  [/\babyss(al)? jewels?\b/, 'Abyss Jewel'],
+  [/\bjewels?\b/, 'Base Jewel'],
+  [/\bbody armou?rs?\b|\bchest\b/, 'Body Armour'],
+  [/\bhelm(et)?s?\b/, 'Helmet'],
+  [/\bgloves?\b|\bgauntlets?\b|\bmitts?\b/, 'Gloves'],
+  [/\bboots?\b|\bgreaves\b/, 'Boots'],
+  [/\bshields?\b|\bbucklers?\b/, 'Shield'],
+  [/\bquivers?\b/, 'Quiver'],
+  [/\bamulets?\b|\btalisman\b/, 'Amulet'],
+  [/\brings?\b/, 'Ring'],
+  [/\bbelts?\b|\bsashe?s?\b/, 'Belt'],
+  [/\brune daggers?\b/, 'Rune Dagger'],
+  [/\bdaggers?\b/, 'Dagger'],
+  [/\bclaws?\b/, 'Claw'],
+  [/\bwands?\b/, 'Wand'],
+  [/\bsceptres?\b/, 'Sceptre'],
+  [/\bwarstaff\b|\bwarstaves\b/, 'Warstaff'],
+  [/\bstaff\b|\bstaves\b/, 'Staff'],
+  [/\bbows?\b/, 'Bow'],
+];
+
+export interface ItemHint {
+  itemClass: string; // as in the tier data: "Helmet", "Base Jewel"...
+  sub: string; // armour kind ("Energy Shield"), or ''
+  from: string; // what was recognised, for the note in the popup
+}
+
+export const readSearchHint = (): ItemHint | null => {
+  const words = (getName() || '').toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return null;
+  const text = ` ${words.join(' ')} `;
+
+  // The longest base type named in the box ("Glorious Plate" in "Kaom's Heart Glorious Plate"):
+  // look up each run of words directly instead of scanning every base.
+  const bases = DATA.bases || {};
+  for (let length = Math.min(words.length, MAX_BASE_WORDS); length > 0; length--) {
+    for (let start = 0; start + length <= words.length; start++) {
+      const base = words.slice(start, start + length).join(' ');
+      if (!Object.prototype.hasOwnProperty.call(bases, base)) continue;
+
+      const [itemClass, sub] = bases[base];
+      return {itemClass, sub, from: base.replace(/\b\w/g, (char) => char.toUpperCase())};
+    }
+  }
+
+  const word = CLASS_WORDS.find(([pattern]) => pattern.test(text));
+  return word ? {itemClass: word[1], sub: '', from: word[1]} : null;
 };
 
 // ---- Looking up tiers --------------------------------------------------------
@@ -104,14 +156,17 @@ const summarize = (labels: string[]) => {
   return `${unique.slice(0, 3).join(', ')} +${unique.length - 3}`;
 };
 
-export const findSections = (statText: string, category: string): TierSection[] => {
+export const findSections = (statText: string, category: string, sub = ''): TierSection[] => {
   const families = DATA.stats[statText];
   if (!families) return [];
 
-  const categoryMatches = (itemClass: string) => {
+  // `sub` narrows to one armour kind (an Energy Shield helmet), when the class has kinds.
+  const classHasSub = Boolean(sub) && DATA.variants.some(([itemClass, kind]) => itemClass.toLowerCase() === category && kind === sub);
+  const categoryMatches = (itemClass: string, kind?: string) => {
     const name = itemClass.toLowerCase();
+    const sameClass = name === category || name === `base ${category}` || name.replace(/-handed/, ' hand') === category;
 
-    return name === category || name === `base ${category}` || name.replace(/-handed/, ' hand') === category;
+    return sameClass && (!classHasSub || kind === undefined || kind === sub);
   };
   const categoryIsKnown = Boolean(category) && DATA.variants.some(([itemClass]) => categoryMatches(itemClass));
 
@@ -120,12 +175,12 @@ export const findSections = (statText: string, category: string): TierSection[] 
   families.forEach((family) => {
     const variants = family.w
       .map((index) => DATA.variants[index])
-      .filter(([itemClass]) => !categoryIsKnown || categoryMatches(itemClass));
+      .filter(([itemClass, kind]) => !categoryIsKnown || categoryMatches(itemClass, kind));
     if (!variants.length) return;
 
     const kind = family.g === 'p' ? 'Prefix' : 'Suffix';
     // When the mod rolls on every kind of the selected category, the category name alone is enough.
-    const plainKinds = DATA.variants.filter(([itemClass, , influence]) => categoryMatches(itemClass) && !influence);
+    const plainKinds = DATA.variants.filter(([itemClass, kind, influence]) => categoryMatches(itemClass, kind) && !influence);
     const coversWholeCategory =
       categoryIsKnown && variants.length === plainKinds.length && variants.every(([, , influence]) => !influence);
     const where = coversWholeCategory
@@ -294,8 +349,11 @@ const openPopup = (button: HTMLElement, row: Element) => {
   const minInput = row.querySelector('input.minmax') as HTMLInputElement | null;
   if (!statText || !minInput) return;
 
-  const category = readCategory();
-  const sections = findSections(statText, category);
+  // Item Category first; when it is Any, what the main search box names.
+  const chosenCategory = readCategory();
+  const hint = chosenCategory ? null : readSearchHint();
+  const category = chosenCategory || (hint ? hint.itemClass.toLowerCase() : '');
+  const sections = findSections(statText, category, hint ? hint.sub : '');
   const titleElement = row.querySelector('.filter-title');
 
   const popup = element('div', 'bt-tier-popup');
@@ -304,8 +362,17 @@ const openPopup = (button: HTMLElement, row: Element) => {
     element('div', 'bt-tier-popup-title', `Tier picker · ${titleElement ? (titleElement.textContent || '').trim() : ''}`)
   );
 
+  if (hint) {
+    const kind = [hint.itemClass.replace(/^Base /, ''), hint.sub].filter(Boolean).join(', ');
+    popup.appendChild(
+      element('div', 'bt-tier-popup-note', `Item type from the search box: ${hint.from}${hint.from === hint.itemClass ? '' : ` (${kind})`}. Pick an Item Category to change it.`)
+    );
+  }
+
   if (!sections.length) {
-    popup.appendChild(element('div', 'bt-tier-popup-note', 'No tiers found for this mod on the selected Item Category.'));
+    popup.appendChild(
+      element('div', 'bt-tier-popup-note', `No tiers found for this mod on ${hint ? 'that item type' : 'the selected Item Category'}.`)
+    );
   }
 
   sections.forEach(({label, kind, tiers}) => {
@@ -333,7 +400,7 @@ const openPopup = (button: HTMLElement, row: Element) => {
     });
   });
 
-  if (sections.length && !DATA.variants.some(([itemClass]) => itemClass.toLowerCase().includes(category) && category)) {
+  if (!hint && sections.length && !(category && DATA.variants.some(([itemClass]) => itemClass.toLowerCase().includes(category)))) {
     popup.appendChild(
       element('div', 'bt-tier-popup-note', 'Pick an Item Category (e.g. Staff) to see only the tiers for that item type.')
     );
