@@ -3,6 +3,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {deflateSync, gunzipSync, gzipSync} from 'node:zlib';
 import {JSDOM} from 'jsdom';
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
@@ -24,12 +25,12 @@ const PAGE = `<!doctype html><html><head><title>Trade - Path of Exile</title></h
   <div class="results"><div class="resultset">${row}${secondRow}<div class="row controls"><button class="btn load-more-btn"><span>Load More</span></button></div></div></div>
 </div></div></body></html>`;
 
-const load = async ({path = '/trade/search/Standard/abc123', settings = [], rarityValue = '', script = '', local = {}} = {}) => {
+const load = async ({path = '/trade/search/Standard/abc123', settings = [], rarityValue = '', script = '', local = {}, onFetch = null, onMessage = null, nodeStreams = false} = {}) => {
   const store = {};
   const dom = new JSDOM(PAGE.replace('</body>', `${script}</body>`), {url: `https://www.pathofexile.com${path}`, runScripts: 'outside-only', pretendToBeVisual: true});
   const {window} = dom;
   window.chrome = {
-    runtime: {getURL: (p) => `chrome-extension://test/${p}`, sendMessage: async () => null},
+    runtime: {getURL: (p) => `chrome-extension://test/${p}`, sendMessage: async (message) => (onMessage ? onMessage(message) : null)},
     storage: {
       local: {
         get: async (keys) => Object.fromEntries((keys || Object.keys(store)).filter((k) => k in store).map((k) => [k, store[k]])),
@@ -40,7 +41,9 @@ const load = async ({path = '/trade/search/Standard/abc123', settings = [], rari
   };
   window.document.hasFocus = () => true;
   // The extension loads its tier table from its own files.
-  window.fetch = async (url) => {
+  window.fetch = async (url, init) => {
+    const handled = onFetch && (await onFetch(String(url), init));
+    if (handled) return handled;
     const path = String(url).replace('chrome-extension://test/', '');
     const body = readFileSync(new URL(`../dist/chrome/${path}`, import.meta.url), 'utf8');
 
@@ -48,6 +51,7 @@ const load = async ({path = '/trade/search/Standard/abc123', settings = [], rari
   };
   window.TextEncoder = TextEncoder; // jsdom lacks these; browsers have them
   window.TextDecoder = TextDecoder;
+  if (nodeStreams) Object.assign(window, {Blob, Response, CompressionStream, DecompressionStream}); // jsdom lacks streams
   Object.entries(local).forEach(([key, value]) => window.localStorage.setItem(key, value));
   settings.forEach((key) => window.localStorage.setItem(`bt-setting-${key}`, 'on'));
   // Stand-in for the site's own dropdown: clicking an option selects it.
@@ -94,7 +98,7 @@ test('settings are off by default and turn features on', async () => {
   await sleep(50);
   const box = (label) => [...document.querySelectorAll('.bt-form-checkbox')].find((b) => b.textContent.trim() === label);
   const isChecked = (label) => box(label).querySelector('.bt-form-checkbox-indicator').classList.contains('is-active');
-  assert.deepEqual([...document.querySelectorAll('.bt-settings .bt-form-checkbox')].map((b) => b.textContent.trim()), ['Fuzzy search', 'Tier search', 'Highlight searched mods', 'Item rarity starts on Any Non-Unique', 'Show panel when hovering the icon']);
+  assert.deepEqual([...document.querySelectorAll('.bt-settings .bt-form-checkbox')].map((b) => b.textContent.trim()), ['Fuzzy search', 'Tier search', 'Highlight searched mods', 'Stat filters are collapsible', 'Item rarity starts on Any Non-Unique', 'Show panel when hovering the icon']);
   assert.equal(isChecked('Highlight searched mods'), true);
   assert.equal(isChecked('Item rarity starts on Any Non-Unique'), false);
   assert.equal(isChecked('Fuzzy search'), false);
@@ -509,7 +513,7 @@ test('every group in the stat filter list can be collapsed, and the choice is re
     <li class="multiselect__element"><span class="multiselect__option multiselect__option--disabled">Explicit</span></li>
     <li class="multiselect__element"><span class="multiselect__option"><span class="mutate-type mutate-type-explicit">explicit</span> #% increased Spell Damage</span></li>
   </ul></div>`;
-  const {document, window} = await load({script: list, local: {'bt-pseudo-collapsed': 'on'}});
+  const {document, window} = await load({script: list, local: {'bt-pseudo-collapsed': 'on'}, settings: ['collapsible-stat-groups']});
   const style = () => document.getElementById('bt-collapsed-stat-groups').textContent;
   // The old "Pseudo collapsed" setting carries over.
   assert.match(style(), /mutate-type-pseudo\) \{ display: none/);
@@ -530,4 +534,280 @@ test('the hover setting is labelled "Show panel when hovering the icon"', async 
   click([...document.querySelectorAll('.bt-root-page-menu-item')].find((tab) => tab.textContent.includes('Settings')));
   await sleep(50);
   assert.ok(document.body.textContent.includes('Show panel when hovering the icon'));
+});
+
+test('stat filter groups only collapse while "Stat filters are collapsible" is on (off by default)', async () => {
+  const list = `<div class="filter-select-mutate"><ul>
+    <li class="multiselect__element"><span class="multiselect__option multiselect__option--disabled">Explicit</span></li>
+    <li class="multiselect__element"><span class="multiselect__option"><span class="mutate-type mutate-type-explicit">explicit</span> #% increased Spell Damage</span></li>
+  </ul></div>`;
+  const {document, window} = await load({script: list, local: {'bt-collapsed-stat-groups': '["explicit"]'}});
+  const style = () => document.getElementById('bt-collapsed-stat-groups').textContent;
+  // Off: nothing hidden, headings untouched, clicks ignored.
+  assert.equal(style(), '');
+  assert.ok(!document.body.classList.contains('bt-collapsible-stat-groups'));
+  click(document.querySelector('.multiselect__option--disabled'));
+  assert.equal(window.localStorage.getItem('bt-collapsed-stat-groups'), '["explicit"]');
+
+  // Turning the setting on applies the remembered groups straight away.
+  click([...document.querySelectorAll('.bt-root-page-menu-item')].find((tab) => tab.textContent.includes('Settings')));
+  await sleep(50);
+  const box = [...document.querySelectorAll('.bt-settings .bt-form-checkbox')].find((b) => b.textContent.includes('Stat filters are collapsible'));
+  click(box.querySelector('input') || box);
+  await sleep(50);
+  assert.ok(document.body.classList.contains('bt-collapsible-stat-groups'));
+  assert.match(style(), /mutate-type-explicit\) \{ display: none/);
+});
+
+// ---- Add build (Path of Building import) ------------------------------------------------
+
+const POB_XML = `<PathOfBuilding>
+<Build className="Ranger" ascendClassName="Deadeye" level="95"/>
+<Tree activeSpec="1"><Spec><Sockets><Socket nodeId="1" itemId="3"/><Socket nodeId="2" itemId="0"/></Sockets></Spec></Tree>
+<Items activeItemSet="1">
+<Item id="1">Rarity: RARE
+Doom Crown
+Hubris Circlet
+Item Level: 84
+Implicits: 0
++90 to maximum Energy Shield
++42% to Fire Resistance
+17% reduced Mana Cost of Skills
+{crafted}+1 to Level of Socketed Gems
+Some line the trade site does not know</Item>
+<Item id="2">Rarity: UNIQUE
+Kaom's Heart
+Glorious Plate
+Variant: Pre 3.0
+Variant: Current
+Selected Variant: 2
+Implicits: 0
+{variant:1}+(30-40)% to Fire Resistance
+{variant:2}+(500-600) to maximum Life
+{crafted}+42% to Fire Resistance</Item>
+<Item id="3">Rarity: RARE
+Dusk Delirium
+Viridian Jewel
+Implicits: 0
+7% increased maximum Life</Item>
+<Item id="5">Rarity: UNIQUE
+My Example Ring
+Gold Ring
+Implicits: 0
++90 to maximum Energy Shield</Item>
+<Item id="6">Rarity: RARE
+Example Bow
+Best Bow Base
+Implicits: 0
++42% to Fire Resistance</Item>
+<Item id="8">Rarity: MAGIC
+Alchemist's Divine Life Flask of Staunching
+Item Level: 82
+Quality: 20
+Implicits: 0
+25% increased effect
+23% reduced Duration
+Grants Immunity to Bleeding for 4 seconds if used while Bleeding
+Grants Immunity to Corrupted Blood for 4 seconds if used while affected by Corrupted Blood
+Gain 2 Charges when you are Hit by an Enemy</Item>
+<Item id="4">Rarity: RARE
+Swap Bow
+Spine Bow
+Implicits: 0</Item>
+<Item id="7">Rarity: RARE
+Starter Cap
+Hubris Circlet
+Implicits: 0
++40 to maximum Energy Shield</Item>
+<ItemSet id="2" title="Leveling"><Slot name="Helmet" itemId="7"/></ItemSet>
+<ItemSet id="1" title="Endgame"><Slot name="Flask 1" itemId="8"/><Slot name="Ring 1" itemId="5"/><Slot name="Weapon 1" itemId="6"/><Slot name="Helmet" itemId="1"/><Slot name="Body Armour" itemId="2"/><Slot name="Weapon 1 Swap" itemId="4"/><Slot name="Gloves" itemId="0"/></ItemSet>
+</Items>
+</PathOfBuilding>`;
+const POB_CODE = deflateSync(Buffer.from(POB_XML)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+
+const TRADE_DATA = {
+  stats: {result: [
+    {id: 'explicit', entries: [
+      {id: 'explicit.stat_es', text: '+# to maximum Energy Shield'},
+      {id: 'explicit.stat_es_local', text: '+# to maximum Energy Shield (Local)'},
+      {id: 'explicit.stat_fire', text: '+#% to Fire Resistance'},
+      {id: 'explicit.stat_mana_cost', text: '#% increased Mana Cost of Skills'},
+      {id: 'explicit.stat_gems', text: '+# to Level of Socketed Gems'},
+      {id: 'explicit.stat_life_pct', text: '#% increased maximum Life'},
+      {id: 'explicit.stat_life', text: '+# to maximum Life'},
+      {id: 'explicit.stat_effect', text: '#% increased effect'},
+      {id: 'explicit.stat_charge_hit', text: 'Gain # Charge when you are Hit by an Enemy'},
+      {id: 'explicit.stat_duration', text: '#% increased Duration'},
+      {id: 'explicit.stat_bleed_immunity', text: 'Grants Immunity to Bleeding for # seconds if used while Bleeding\nGrants Immunity to Corrupted Blood for # seconds if used while affected by Corrupted Blood'},
+    ]},
+    {id: 'crafted', entries: [{id: 'crafted.stat_gems', text: '+# to Level of Socketed Gems'}]},
+  ]},
+  items: {result: [
+    {id: 'armour', entries: [{type: 'Hubris Circlet'}, {type: 'Glorious Plate'}, {name: "Kaom's Heart", type: 'Glorious Plate'}]},
+    {id: 'weapon', entries: [{type: 'Spine Bow'}]},
+    {id: 'jewel', entries: [{type: 'Viridian Jewel'}]},
+    {id: 'flask', entries: [{type: 'Divine Life Flask'}]},
+  ]},
+};
+const tradeData = async (url) => {
+  const match = /\/api\/trade\/data\/(stats|items)$/.exec(url);
+  return match ? {ok: true, json: async () => TRADE_DATA[match[1]]} : null;
+};
+const decodeSlug = (slug) => JSON.parse(gunzipSync(Buffer.from(slug.replace(/-/g, '+').replace(/_/g, '/'), 'base64')).toString());
+
+const addBuild = async (document, window, input, setTitle = null) => {
+  click(button(document, 'Add build'));
+  await sleep(30);
+  type(document.querySelector('.bt-modal-container input'), input);
+  await sleep(500); // the build is read shortly after pasting
+  if (setTitle) {
+    const select = document.querySelector('.bt-build-import-set');
+    select.value = [...select.options].find((option) => option.textContent === setTitle).value;
+    select.dispatchEvent(new window.Event('change', {bubbles: true}));
+    await sleep(30);
+  }
+  document.querySelector('.bt-modal-container form').dispatchEvent(new window.Event('submit', {bubbles: true, cancelable: true}));
+  await sleep(300);
+};
+
+test('Add build turns a Path of Building code into a folder of trade searches', async () => {
+  const {document, window, store} = await load({onFetch: tradeData, nodeStreams: true});
+  await addBuild(document, window, POB_CODE);
+
+  const folder = store['bookmark-folders'].value[0];
+  // The build has two item sets; its own choice ("Endgame") is used unless another is picked.
+  assert.equal(folder.title, 'Deadeye (level 95) \u2013 Endgame');
+  assert.equal(folder.icon, 'deadeye');
+  const trades = store[`bookmark-trades--${folder.id}`].value;
+  // Equipped items and tree jewels, in slot order; weapon swap and empty slots left out.
+  assert.deepEqual(trades.map((t) => t.title), [
+    'Weapon: Example Bow (Best Bow Base, any base)',
+    'Helmet: Doom Crown (Hubris Circlet)',
+    "Body Armour: Kaom's Heart",
+    'Ring: My Example Ring (not a real unique, searched by mods)',
+    'Flask: Divine Life Flask',
+    'Jewel: Dusk Delirium (Viridian Jewel)',
+  ]);
+
+  // A magic flask: base found inside its name, and every mod kept, including the two-line
+  // immunity suffix the trade site lists as a single stat.
+  const flask = decodeSlug(trades[4].location.slug);
+  assert.equal(flask.type, 'Divine Life Flask');
+  assert.deepEqual(flask.stats[0].filters, [
+    {id: 'explicit.stat_effect', value: {min: 20}},
+    {id: 'explicit.stat_duration'},
+    {id: 'explicit.stat_bleed_immunity', value: {min: 3}},
+    {id: 'explicit.stat_charge_hit', value: {min: 2}}, // "Charges" written "Charge" on the trade site
+  ]);
+
+  // Example items: an invented base falls back to the slot's item type...
+  const bow = decodeSlug(trades[0].location.slug);
+  assert.equal(bow.type, undefined);
+  assert.deepEqual(bow.filters.type_filters.filters, {rarity: {option: 'nonunique'}, category: {option: 'weapon'}});
+  assert.deepEqual(bow.stats[0].filters, [{id: 'explicit.stat_fire', value: {min: 33}}]);
+  // ...and a made-up unique is searched by its mods, without asking for that name.
+  const ring = decodeSlug(trades[3].location.slug);
+  assert.equal(ring.name, undefined);
+  assert.deepEqual(ring.filters.type_filters.filters, {category: {option: 'accessory.ring'}});
+  assert.deepEqual(ring.stats[0].filters, [{id: 'explicit.stat_es', value: {min: 72}}]);
+
+  const helmet = decodeSlug(trades[1].location.slug);
+  assert.deepEqual(helmet.filters.type_filters.filters, {rarity: {option: 'nonunique'}, category: {option: 'armour.helmet'}});
+  assert.deepEqual(helmet.stats[0].filters, [
+    {id: 'explicit.stat_es_local', value: {min: 72}}, // armour uses the local stat; 80% of 90
+    {id: 'explicit.stat_fire', value: {min: 33}},
+    {id: 'explicit.stat_mana_cost'}, // "reduced" = negative "increased": no minimum
+    {id: 'crafted.stat_gems', value: {min: 1}}, // small counts stay exact
+  ]);
+  // Uniques: by name, plus the mods of the version picked in Path of Building, with no values
+  // (so any roll matches). Other versions' lines and crafted lines are left out; no trade mode.
+  assert.deepEqual(decodeSlug(trades[2].location.slug), {
+    name: "Kaom's Heart",
+    type: 'Glorious Plate',
+    stats: [{type: 'and', filters: [{id: 'explicit.stat_life'}]}],
+  });
+  assert.equal(decodeSlug(trades[5].location.slug).type, 'Viridian Jewel');
+});
+
+test('Add build reads pobb.in links through the background script, and explains bad input', async () => {
+  const asked = [];
+  const {document, window, store} = await load({
+    onFetch: tradeData,
+    nodeStreams: true,
+    onMessage: (message) => (asked.push(message), message.query === 'pobb-in' ? POB_CODE : null),
+  });
+  await addBuild(document, window, 'https://pobb.in/rO_I0IZSTuv-');
+  assert.deepEqual(JSON.parse(JSON.stringify(asked.filter((m) => m.query === 'pobb-in'))), [{query: 'pobb-in', id: 'rO_I0IZSTuv-'}]);
+  assert.equal(store['bookmark-folders'].value.length, 1);
+
+  await addBuild(document, window, 'hello');
+  assert.match(document.querySelector('.bt-modal-container').textContent, /Path of Building code or a pobb\.in link/);
+  assert.equal(store['bookmark-folders'].value.length, 1);
+});
+
+test('Add build lists the build\'s item sets and uses the one picked', async () => {
+  const {document, window, store} = await load({onFetch: tradeData, nodeStreams: true});
+  click(button(document, 'Add build'));
+  await sleep(30);
+  type(document.querySelector('.bt-modal-container input'), POB_CODE);
+  await sleep(500);
+  const select = document.querySelector('.bt-build-import-set');
+  assert.deepEqual([...select.options].map((o) => o.textContent), ['Leveling', 'Endgame']);
+  assert.equal(select.options[select.selectedIndex].textContent, 'Endgame'); // the build's active set
+  click(button(document, 'Cancel') || document.querySelector('.bt-modal-close') || document.body);
+
+  const fresh = await load({onFetch: tradeData, nodeStreams: true});
+  await addBuild(fresh.document, fresh.window, POB_CODE, 'Leveling');
+  const folder = fresh.store['bookmark-folders'].value[0];
+  assert.equal(folder.title, 'Deadeye (level 95) – Leveling');
+  const trades = fresh.store[`bookmark-trades--${folder.id}`].value;
+  // Leveling set: just its helmet, plus the jewels in the passive tree.
+  assert.deepEqual(trades.map((t) => t.title), ['Helmet: Starter Cap (Hubris Circlet)', 'Jewel: Dusk Delirium (Viridian Jewel)']);
+  assert.deepEqual(decodeSlug(trades[0].location.slug).stats[0].filters, [{id: 'explicit.stat_es_local', value: {min: 32}}]);
+  void store;
+});
+
+// ---- Trade mode (In Person / Instant Buyout) is not tied to saved links ----------------------
+
+const makeSlug = (query) => gzipSync(Buffer.from(JSON.stringify(query))).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const LIFE_SEARCH = {stats: [{type: 'and', filters: [{id: 'explicit.stat_3299347043', value: {min: 70}}]}]};
+
+test('bookmarks are saved without the trade mode and open in the mode you are using', async () => {
+  // You are on an Instant Buyout search.
+  const instantSlug = makeSlug({status: {option: 'securable'}, ...LIFE_SEARCH});
+  const {document, window, store} = await load({
+    path: `/trade/search/Standard/${instantSlug}`,
+    nodeStreams: true,
+    local: {'bt-bookmark-folders-expansion': 'f1'},
+    seed: undefined,
+  });
+  await sleep(100);
+  // The mode of the search you ran is remembered...
+  assert.equal(window.localStorage.getItem('bt-trade-mode-1'), 'securable');
+
+  // ...and an old bookmark saved as "In Person" opens as Instant Buyout.
+  const oldSlug = makeSlug({status: {option: 'online'}, ...LIFE_SEARCH});
+  await window.chrome.storage.local.set({
+    'bookmark-folders': {value: [{id: 'f1', title: 'My build', version: '1', icon: null, archivedAt: null}], expiresAt: null},
+    'bookmark-trades--f1': {value: [{id: 't1', title: 'Life helmet', completedAt: null, location: {version: '1', type: 'search', slug: oldSlug}}], expiresAt: null},
+  });
+  window.dispatchEvent(new window.Event('focus'));
+  click(tab(document, 'History'));
+  await sleep(50);
+  click(tab(document, 'Bookmarks'));
+  await sleep(300);
+  const link = document.querySelector('.bt-folder-trade-link');
+  assert.ok(link, 'bookmark link shown');
+  const opened = decodeSlug(link.getAttribute('href').split('/').pop());
+  assert.equal(opened.status.option, 'securable');
+  assert.deepEqual(opened.stats, LIFE_SEARCH.stats);
+
+  // Registering the current trade saves it with no mode at all.
+  click(button(document, 'Register current trade'));
+  await sleep(150);
+  document.querySelector('.bt-modal-container form').dispatchEvent(new window.Event('submit', {bubbles: true, cancelable: true}));
+  await sleep(150);
+  const saved = store['bookmark-trades--f1'].value.find((t) => t.id !== 't1');
+  assert.deepEqual(decodeSlug(saved.location.slug), LIFE_SEARCH);
+  void store;
 });

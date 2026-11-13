@@ -1,12 +1,18 @@
-import {useRef, useState} from 'preact/hooks';
+import {useEffect, useRef, useState} from 'preact/hooks';
 import * as bookmarks from '../lib/bookmarks';
 import type {BookmarkFolder, BookmarkTrade} from '../lib/bookmarks';
 import {assetUrl} from '../lib/ext';
+import {createBuildFolder, listItemSets, loadBuild} from '../lib/pob-import';
+import type {ItemSetChoice} from '../lib/pob-import';
+import {withoutTradeMode} from '../lib/search-link';
+import {isAdvancedFilteringOn} from '../lib/settings';
 import {recommendTitle} from '../lib/search-panel';
 import {currentLocation, tradeUrl} from '../lib/trade-location';
+import type {TradeSiteVersion} from '../lib/trade-location';
 import {copyToClipboard} from '../lib/util';
-import {AlertMessage, BookmarkFolderIcon, Button, ClipboardTextarea, ContextualMenu, Field, flash, Form, Input, Modal, useLoaded} from './common';
+import {AlertMessage, BookmarkFolderIcon, Button, ClipboardTextarea, ContextualMenu, Field, flash, Form, Input, Modal, useLoaded, useTradeModeSlugs} from './common';
 import {FaIcon} from './icons';
+import {ModFilter} from './ModFilter';
 
 const FOLDERS_WARNING_THRESHOLD = 10;
 
@@ -91,7 +97,9 @@ export function Bookmarks() {
   const [isShowingArchived, setIsShowingArchived] = useState(false);
   const [stagedFolder, setStagedFolder] = useState<BookmarkFolder | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isAddingBuild, setIsAddingBuild] = useState(false);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const advancedFiltering = useLoaded(['settings-change'], isAdvancedFilteringOn, isAdvancedFilteringOn());
 
   const applicable = all.filter(({folder}) => folder.version === location.version);
   const active = applicable.filter(({folder}) => !folder.archivedAt);
@@ -128,20 +136,34 @@ export function Bookmarks() {
     setIsImporting(false);
   };
 
+  const persistBuildFolder = async (folder: BookmarkFolder, trades: BookmarkTrade[]) => {
+    const id = await bookmarks.saveFolder(folder);
+    await bookmarks.saveTrades(trades, id);
+    if (!expandedIds.includes(id)) updateExpanded([...expandedIds, id]);
+    flash.success(`The folder "${folder.title}" has been created with ${trades.length} searches.`);
+    setIsAddingBuild(false);
+  };
+
+  const headerActions = (
+    <>
+      {active.length > 0 && !showingArchived && <Button theme="gold" label="Collapse folders" icon="compress-alt" onClick={() => updateExpanded([])} />}
+      {archived.length > 0 && (
+        <Button
+          theme="gold"
+          label={showingArchived ? 'Return to active folders' : 'Show archive'}
+          icon={showingArchived ? 'undo' : 'archive'}
+          onClick={() => setIsShowingArchived(!showingArchived)}
+        />
+      )}
+    </>
+  );
+
   return (
     <>
       <div>
-        <div class="bt-bookmarks-header-actions">
-          {active.length > 0 && !showingArchived && <Button theme="gold" label="Collapse folders" icon="compress-alt" onClick={() => updateExpanded([])} />}
-          {archived.length > 0 && (
-            <Button
-              theme="gold"
-              label={showingArchived ? 'Return to active folders' : 'Show archive'}
-              icon={showingArchived ? 'undo' : 'archive'}
-              onClick={() => setIsShowingArchived(!showingArchived)}
-            />
-          )}
-        </div>
+        {/* With Advanced filtering on, the result filter sits here and "Collapse folders" joins its
+            Load all / Next 100 row; otherwise "Collapse folders" has a row of its own. */}
+        {advancedFiltering ? <ModFilter trailing={headerActions} /> : <div class="bt-bookmarks-header-actions">{headerActions}</div>}
 
         <div class="bt-bookmarks-folders-wrapper">
           {displayed.map(({folder, trades}) => (
@@ -173,6 +195,7 @@ export function Bookmarks() {
               onClick={() => setStagedFolder({title: '', icon: null, version: location.version, archivedAt: null})}
             />
             <Button theme="gold" class="bt-bookmarks-create-folder-button" label="Import folder" icon="plus-square" onClick={() => setIsImporting(true)} />
+            <Button theme="gold" class="bt-bookmarks-create-folder-button" label="Add build" icon="user-plus" onClick={() => setIsAddingBuild(true)} />
           </div>
         )}
 
@@ -194,6 +217,13 @@ export function Bookmarks() {
       <Backup />
 
       {stagedFolder && <FolderEdition folder={stagedFolder} onCancel={() => setStagedFolder(null)} onSubmit={(folder) => void persistFolder(folder)} />}
+      {isAddingBuild && (
+        <BuildImport
+          version={location.version}
+          onCancel={() => setIsAddingBuild(false)}
+          onSubmit={(folder, trades) => void persistBuildFolder(folder, trades)}
+        />
+      )}
       {isImporting && <FolderImport onCancel={() => setIsImporting(false)} onSubmit={(result) => void persistImportedFolder(result)} />}
     </>
   );
@@ -216,13 +246,17 @@ function Folder(props: {
   const [isExporting, setIsExporting] = useState(false);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
 
-  const url = (trade: BookmarkTrade, suffix = '') => tradeUrl(trade.location.version, trade.location.type, trade.location.slug, league) + suffix;
+  // Links open in the trade mode you are using now, not the one saved with them.
+  const slugFor = useTradeModeSlugs(trades.map((trade) => ({key: trade.id as string, slug: trade.location.slug, version: trade.location.version})));
+  const url = (trade: BookmarkTrade, suffix = '') =>
+    tradeUrl(trade.location.version, trade.location.type, slugFor(trade.id as string, trade.location.slug), league) + suffix;
 
-  const createTrade = () => {
+  const createTrade = async () => {
     const {version, type, slug} = currentLocation();
     if (!type || !slug) return;
 
-    setStagedTrade({title: recommendTitle(), completedAt: null, location: {version, type, slug}});
+    // Saved without the trade mode, so opening it later keeps whichever mode you are using.
+    setStagedTrade({title: recommendTitle(), completedAt: null, location: {version, type, slug: await withoutTradeMode(slug)}});
   };
 
   const persistTrade = async (trade: BookmarkTrade) => {
@@ -235,7 +269,7 @@ function Folder(props: {
     const {version, type, slug} = currentLocation();
     if (!type || !slug) return;
 
-    await bookmarks.saveTrade({...trade, location: {version, type, slug}}, folderId);
+    await bookmarks.saveTrade({...trade, location: {version, type, slug: await withoutTradeMode(slug)}}, folderId);
     flash.success(`The trade location for "${trade.title}" has been updated.`);
   };
 
@@ -325,7 +359,7 @@ function Folder(props: {
             </ul>
 
             <div class="bt-folder-actions">
-              <Button theme="gold" class="bt-folder-actions-new-trade" label="Register current trade" onClick={createTrade} />
+              <Button theme="gold" class="bt-folder-actions-new-trade" label="Register current trade" onClick={() => void createTrade()} />
             </div>
           </div>
         )}
@@ -461,6 +495,86 @@ function FolderImport(props: {onCancel: () => void; onSubmit: (result: [Bookmark
         )}
 
         <Button type="submit" theme="gold" label="Save" icon="save" />
+      </Form>
+    </Modal>
+  );
+}
+
+function BuildImport(props: {version: TradeSiteVersion; onCancel: () => void; onSubmit: (folder: BookmarkFolder, trades: BookmarkTrade[]) => void}) {
+  const [input, setInput] = useState('');
+  const [percent, setPercent] = useState('80');
+  const [build, setBuild] = useState<Document | null>(null);
+  const [sets, setSets] = useState<ItemSetChoice[]>([]);
+  const [setId, setSetId] = useState('');
+  const [isReading, setIsReading] = useState(false);
+  const [isWorking, setIsWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const minPercent = Math.min(100, Math.max(0, parseInt(percent, 10) || 0));
+
+  // Read the build as soon as a code or link is pasted, so its item sets can be listed.
+  useEffect(() => {
+    setBuild(null);
+    setSets([]);
+    setError(null);
+    if (!input.trim()) return undefined;
+
+    let isCurrent = true;
+    const timer = window.setTimeout(async () => {
+      setIsReading(true);
+      const result = await loadBuild(input);
+      if (!isCurrent) return;
+      setIsReading(false);
+      if (typeof result === 'string') {
+        setError(result);
+        return;
+      }
+      const listed = listItemSets(result);
+      setBuild(result);
+      setSets(listed.sets);
+      setSetId(listed.active);
+    }, 300);
+
+    return () => {
+      isCurrent = false;
+      window.clearTimeout(timer);
+    };
+  }, [input]);
+
+  const submit = async () => {
+    if (!build) return;
+    setIsWorking(true);
+    setError(null);
+    const result = await createBuildFolder(build, props.version, minPercent, setId || undefined);
+    setIsWorking(false);
+    if (typeof result === 'string') setError(result);
+    else if (!result.trades.length) setError('No searches could be made from this item set.');
+    else props.onSubmit(result.folder, result.trades);
+  };
+
+  return (
+    <Modal title="Add build" onClose={props.onCancel}>
+      <Form canSubmit={Boolean(build) && !isWorking} onSubmit={() => void submit()}>
+        <Input label="Path of Building code or pobb.in link" autofocus onChange={setInput} />
+        {sets.length > 1 && (
+          <Field label="Item set">
+            <select class="bt-form-input bt-build-import-set" value={setId} onChange={(event) => setSetId((event.target as HTMLSelectElement).value)}>
+              {sets.map((set) => (
+                <option key={set.id} value={set.id}>
+                  {set.title}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <Input label="Minimum mod values (% of the build's rolls)" value={percent} onChange={setPercent} />
+        <div class="bt-build-import-help">
+          {isReading
+            ? 'Reading build\u2026'
+            : `Makes a folder with a trade search for each item the build wears. Uniques are searched by name and their mods (any roll); other items by their mods, at ${minPercent}% of the build's values.`}
+        </div>
+        {error && <AlertMessage type="alert" message={error} />}
+        <Button type="submit" theme="gold" label={isWorking ? 'Adding\u2026' : 'Add build'} icon="user-plus" />
       </Form>
     </Modal>
   );

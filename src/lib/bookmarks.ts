@@ -1,4 +1,5 @@
 import {local, storage} from './ext';
+import {searchKey} from './search-link';
 import {base64Decode, base64Encode, emit, uniqueId} from './util';
 import type {TradeSiteVersion} from './trade-location';
 
@@ -132,16 +133,17 @@ export const findTradeByLocation = async (location: {
   const folders = await fetchFolders();
   const active: BookmarkTrade[] = [];
   const archived: BookmarkTrade[] = [];
+  // Bookmarks are saved without a trade mode, so compare the searches with the mode left out.
+  const target = await searchKey(location.slug);
 
   for (const folder of folders) {
     if (!folder.id) continue;
 
-    const matches = (await fetchTrades(folder.id)).filter(
-      (trade) =>
-        trade.location.version === location.version &&
-        trade.location.slug === location.slug &&
-        trade.location.type === location.type
-    );
+    const matches: BookmarkTrade[] = [];
+    for (const trade of await fetchTrades(folder.id)) {
+      if (trade.location.version !== location.version || trade.location.type !== location.type) continue;
+      if (trade.location.slug === location.slug || (await searchKey(trade.location.slug)) === target) matches.push(trade);
+    }
     (folder.archivedAt ? archived : active).push(...matches);
   }
 

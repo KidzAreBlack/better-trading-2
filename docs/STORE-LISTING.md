@@ -16,12 +16,14 @@ Exile Center (the authors of Better Trading) or Grinding Gear Games.
 Features:
 • Bookmarks: folders of saved searches with drag-to-reorder, archive, delete, share strings and backup
   files. Backups from the original Better Trading import as-is.
+• Add build: paste a Path of Building code or pobb.in link to get a folder with a trade search for every
+  item the build wears.
 • History of the searches you run, and pinned items for comparing results.
 • Equivalent prices from poe.ninja (PoE 1), highlighting of the mods you searched for, a socket warning
   and grouping of identical listings.
 • Optional tools in Settings: fuzzy search, a tier picker for stat filters (PoE 1), result filtering by
   mod tier or name with Load all / Next 100, a default "Any Non-Unique" rarity, and opening the hidden
-  panel when hovering its icon, and collapsible groups in the stat filter list.
+  panel when hovering its icon, and collapsible stat filter groups.
 
 Everything is stored in your own browser. No tracking, analytics or ads.
 Source code: https://github.com/KidzAreBlack/better-trading-2
@@ -48,6 +50,8 @@ Path of Exile trade website.
   currency prices, locally in the browser.
 - Host permission `https://poe.ninja/*`: downloads public currency prices from poe.ninja to show
   "equivalent prices" on trade results. Only the league name is sent.
+- Host permission `https://pobb.in/*`: when the user pastes a pobb.in link into "Add build", downloads
+  that shared Path of Building build so its items can be turned into trade searches.
 - Content script on `*://www.pathofexile.com/trade*`: shows the sidebar and search tools on the
   trade site, the only site the extension works on.
 
@@ -80,7 +84,8 @@ sell data, does not use it for unrelated purposes, and does not use it for credi
 > (`build.mjs`). No remote code. The only `innerHTML` assignment flagged by the linter is inside the
 > bundled Preact library (dangerouslySetInnerHTML support), which this extension never uses.
 > `assets/data/poe1-tiers.json` is static data generated from RePoE (`scripts/build-tier-data.py`).
-> Network use: poe.ninja public price API from the background script; images from web.poecdn.com.
+> Network use: poe.ninja public price API and pobb.in shared builds (only when the user pastes a pobb.in
+> link into "Add build") from the background script; images from web.poecdn.com.
 > To test: open https://www.pathofexile.com/trade/search/Standard; the Better Trading 2 sidebar appears beside the trade page.
 
 ## Before each new version

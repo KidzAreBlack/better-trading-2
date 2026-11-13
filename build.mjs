@@ -8,6 +8,8 @@ const watch = process.argv.includes('--watch');
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const TRADE_MATCHES = ['*://www.pathofexile.com/trade*'];
 const NINJA_HOST = 'https://poe.ninja/*';
+// "Add build" reads Path of Building codes from pobb.in links.
+const POBB_HOST = 'https://pobb.in/*';
 
 // Firefox add-on id. It can never change once the add-on is uploaded to addons.mozilla.org.
 const GECKO_ID = 'better-trading-2@KidzAreBlack';
@@ -21,7 +23,7 @@ const baseManifest = {
   icons: {16: 'assets/icon16.png', 32: 'assets/icon32.png', 48: 'assets/icon48.png', 128: 'assets/icon128.png'},
   permissions: ['storage'],
   // Price data for the "equivalent prices" feature is fetched from poe.ninja by the background script.
-  host_permissions: [NINJA_HOST],
+  host_permissions: [NINJA_HOST, POBB_HOST],
   content_scripts: [{matches: TRADE_MATCHES, js: ['content.js'], css: ['content.css'], run_at: 'document_idle'}],
   web_accessible_resources: [{resources: ['assets/*'], matches: ['*://www.pathofexile.com/*']}],
 };

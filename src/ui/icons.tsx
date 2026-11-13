@@ -3,7 +3,7 @@ import {faGithub} from '@fortawesome/free-brands-svg-icons';
 import {
   faAngleLeft, faAngleRight, faArchive, faCheck, faCheckCircle, faChevronDown, faClipboard, faCog, faCompressAlt,
   faEllipsisH, faExclamationCircle, faFileExport, faFileImport, faFolderOpen, faFolderPlus, faHistory, faInfoCircle,
-  faPlusSquare, faSave, faSort, faThumbtack, faTimes, faTrashAlt, faUndo,
+  faPlusSquare, faSave, faSort, faThumbtack, faTimes, faTrashAlt, faUndo, faUserPlus,
 } from '@fortawesome/free-solid-svg-icons';
 
 const ICONS = {
@@ -12,7 +12,7 @@ const ICONS = {
   'compress-alt': faCompressAlt, 'ellipsis-h': faEllipsisH, 'exclamation-circle': faExclamationCircle,
   'file-export': faFileExport, 'file-import': faFileImport, 'folder-open': faFolderOpen, 'folder-plus': faFolderPlus,
   github: faGithub, history: faHistory, 'info-circle': faInfoCircle, 'plus-square': faPlusSquare, save: faSave,
-  sort: faSort, thumbtack: faThumbtack, times: faTimes, 'trash-alt': faTrashAlt, undo: faUndo,
+  sort: faSort, thumbtack: faThumbtack, times: faTimes, 'trash-alt': faTrashAlt, undo: faUndo, 'user-plus': faUserPlus,
 };
 
 export type IconName = keyof typeof ICONS;

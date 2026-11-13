@@ -4,7 +4,6 @@ import {isAdvancedFilteringOn, isEnabled} from '../lib/settings';
 import {Bookmarks} from './Bookmarks';
 import {FlashMessages, useLoaded} from './common';
 import {FaIcon, type IconName} from './icons';
-import {ModFilter} from './ModFilter';
 import {About, History, PinnedItems, Settings} from './pages';
 
 const COLLAPSED_KEY = 'side-panel-collapsed';
@@ -22,7 +21,6 @@ export function App() {
   const [pageId, setPageId] = useState('bookmarks');
   const [isAbout, setIsAbout] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(local.get(COLLAPSED_KEY) === 'true');
-  const advancedFiltering = useLoaded(['settings-change'], isAdvancedFilteringOn, isAdvancedFilteringOn());
 
   // Optional "peek": while the panel is hidden, hovering its icon slides the panel
   // in over the page (the page keeps its full width). It slides away again
@@ -104,9 +102,6 @@ export function App() {
                 </li>
               ))}
             </ul>
-
-            {/* The result filter only shows on the Bookmarks tab. */}
-            {advancedFiltering && pageId === 'bookmarks' && <ModFilter />}
 
             <Page />
           </>

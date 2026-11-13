@@ -5,7 +5,7 @@ import {clearHistory, fetchHistory} from '../lib/history';
 import {ENHANCER_KEYS, isEnabled, setEnabled, SETTINGS, SETTINGS_TAB_KEYS} from '../lib/settings';
 import {tradeUrl} from '../lib/trade-location';
 import {sleep, timeAgo} from '../lib/util';
-import {AlertMessage, Button, Checkbox, flash, Mount, useLoaded} from './common';
+import {AlertMessage, Button, Checkbox, flash, Mount, useLoaded, useTradeModeSlugs} from './common';
 
 declare const __VERSION__: string;
 
@@ -14,6 +14,8 @@ const GITHUB_URL = 'https://github.com/KidzAreBlack/better-trading-2';
 
 export function History() {
   const entries = useLoaded(['history-change', 'location-change'], fetchHistory, null);
+  // History links open in the trade mode you are using now.
+  const slugFor = useTradeModeSlugs((entries || []).map((entry) => ({key: entry.id, slug: entry.slug, version: entry.version})));
 
   if (!entries) return null;
   if (!entries.length) return <AlertMessage type="warning" message="The search history is currently empty." />;
@@ -21,7 +23,7 @@ export function History() {
   return (
     <div>
       {entries.map((entry) => (
-        <a key={entry.id} href={tradeUrl(entry.version, entry.type, entry.slug, entry.league)} class="bt-history-entry-link">
+        <a key={entry.id} href={tradeUrl(entry.version, entry.type, slugFor(entry.id, entry.slug), entry.league)} class="bt-history-entry-link">
           <div class="bt-history-entry-title">{entry.title || (entry.type === 'exchange' ? 'Bulk item exchange' : 'Any item')}</div>
           <div class="bt-history-entry-details">
             <div class="bt-history-entry-slug">{entry.league.replace(/^poe2\//, '')}</div>

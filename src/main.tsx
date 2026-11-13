@@ -13,6 +13,7 @@ import {local} from './lib/ext';
 import {applyHighlightColor} from './lib/highlight-color';
 import {setupHistory} from './lib/history';
 import {setupPageTitle} from './lib/page-title';
+import {setupTradeModeTracking} from './lib/search-link';
 import {watchLocation} from './lib/trade-location';
 import {App} from './ui/App';
 
@@ -43,6 +44,7 @@ const start = () => {
 
   watchLocation();
   setupHistory();
+  setupTradeModeTracking();
 };
 
 start();

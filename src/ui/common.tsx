@@ -1,6 +1,8 @@
 import type {ComponentChildren} from 'preact';
 import {useEffect, useRef, useState} from 'preact/hooks';
 import {assetUrl} from '../lib/ext';
+import {currentTradeMode, withTradeMode} from '../lib/search-link';
+import type {TradeSiteVersion} from '../lib/trade-location';
 import {copyToClipboard, emit, on} from '../lib/util';
 import {FaIcon, type IconName} from './icons';
 
@@ -334,4 +336,27 @@ export function Mount(props: {element: HTMLElement | null; class?: string}) {
   }, [props.element]);
 
   return <div class={props.class} style={props.class ? undefined : 'display:contents'} ref={holder} />;
+}
+
+// Saved links (bookmarks, history) opened in the trade mode you are using now (In Person,
+// Instant Buyout...) instead of the one they were saved with. Returns a lookup by key.
+export function useTradeModeSlugs(items: {key: string; slug: string; version: TradeSiteVersion}[]): (key: string, fallback: string) => string {
+  const [resolved, setResolved] = useState<Record<string, string>>({});
+  const [modeChanges, setModeChanges] = useState(0);
+  useEffect(() => on('trade-mode-change', () => setModeChanges((count) => count + 1)), []);
+
+  const signature = items.map((item) => `${item.key}:${item.version}:${item.slug}`).join('|');
+  useEffect(() => {
+    let isCurrent = true;
+    void (async () => {
+      const next: Record<string, string> = {};
+      for (const item of items) next[item.key] = await withTradeMode(item.slug, currentTradeMode(item.version));
+      if (isCurrent) setResolved(next);
+    })();
+    return () => {
+      isCurrent = false;
+    };
+  }, [signature, modeChanges]);
+
+  return (key, fallback) => resolved[key] ?? fallback;
 }

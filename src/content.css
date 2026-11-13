@@ -257,20 +257,21 @@ body.bt-is-collapsed.bt-is-peeking .bt-header-expand-button.is-visible { opacity
 .bt-bookmarks-folder-wrapper.is-dragging .bt-folder { background-color: var(--bt-blue); }
 .bt-bookmarks-folder-wrapper.is-drop-target, .bt-folder-trade.is-drop-target { box-shadow: 0 -2px 0 0 var(--bt-gold-alt); }
 .bt-bookmarks-actions { display: flex; }
-.bt-bookmarks-create-folder-button { width: 100%; }
+.bt-bookmarks-create-folder-button { flex: 1 1 auto; white-space: nowrap; } /* each button as wide as its text, sharing what's left */
+.bt-build-import-help { margin: 4px 0 10px; font-size: 12px; line-height: 1.4; opacity: 0.75; }
 .bt-bookmarks-folders-warning { margin-top: 10px; }
 
 .bt-folder { border: 1px solid var(--bt-blue-alt); }
 .bt-folder.is-expanded .bt-folder-expansion-indicator { transform: rotate(180deg); }
 .bt-folder.is-archived .bt-folder-expansion-wrapper { pointer-events: none; }
 .bt-folder.is-archived .bt-folder-expansion-wrapper::after { display: none; }
-.bt-folder-expansion-wrapper { display: flex; flex: 1 1 auto; align-items: center; padding-right: 5px; cursor: pointer; }
+.bt-folder-expansion-wrapper { display: flex; flex: 1 1 auto; min-width: 0; align-items: center; padding-right: 5px; cursor: pointer; }
 .bt-folder-expansion-wrapper::after { display: block; content: ''; width: 1px; height: 15px; margin-left: 10px; background-color: var(--bt-blue-alt); }
-.bt-folder-expansion-indicator { transform: rotate(0deg); align-items: center; transition: transform 0.2s ease; }
+.bt-folder-expansion-indicator { flex: 0 0 auto; transform: rotate(0deg); align-items: center; transition: transform 0.2s ease; }
 .bt-folder-header { display: flex; align-items: center; background-color: var(--bt-blue); font-family: var(--bt-font); font-size: 15px; color: var(--bt-white); transition: background-color 0.2s ease; }
-.bt-folder-header-icon { width: auto; }
-.bt-folder-header-label { flex: 1 1 auto; overflow: hidden; max-width: 250px; padding: 5px 5px 5px 10px; text-overflow: ellipsis; white-space: nowrap; }
-.bt-folder-header-actions { display: flex; align-items: center; margin-right: 5px; }
+.bt-folder-header-icon { width: auto; flex: 0 0 auto; } /* long folder names shorten instead of squeezing the icon */
+.bt-folder-header-label { flex: 1 1 auto; min-width: 0; overflow: hidden; max-width: 250px; padding: 5px 5px 5px 10px; text-overflow: ellipsis; white-space: nowrap; }
+.bt-folder-header-actions { display: flex; flex: 0 0 auto; align-items: center; margin-right: 5px; }
 .bt-folder-header-action { display: flex; align-items: center; padding: 5px; border: 0; background-color: transparent; outline: none; }
 .bt-folder-trades { padding: 0; border-top: 1px solid var(--bt-blue-alt); margin: 0; list-style: none; }
 .bt-folder-trade { display: flex; position: relative; align-items: center; border-bottom: 1px solid rgba(76, 76, 125, 0.4); background-color: transparent; transition: background-color 0.2s ease; }
@@ -344,7 +345,7 @@ body.bt-is-collapsed.bt-is-peeking .bt-header-expand-button.is-visible { opacity
 .bt-about-enhancer-checkbox + .bt-about-enhancer-checkbox { margin-top: 10px; }
 
 /* Tier search box */
-.bt-mod-filter { margin-bottom: 10px; }
+.bt-mod-filter { margin-bottom: 0; } /* same 5px gap above the folders as without the filter */
 .bt-mod-filter-row { display: flex; }
 .bt-mod-filter-input { flex: 1 1 auto; min-width: 0; height: 30px; padding: 0 10px; border: 1px solid transparent; background-color: #1e2124; outline: none; font-weight: normal; color: var(--bt-white); }
 .bt-mod-filter-input.is-active { border-color: var(--bt-gold-alt); }
@@ -354,12 +355,14 @@ body.bt-is-collapsed.bt-is-peeking .bt-header-expand-button.is-visible { opacity
 .bt-mod-filter-help { padding: 8px; margin-top: 5px; background-color: rgba(22, 22, 22, 0.9); font-size: 12px; line-height: 1.6; color: var(--bt-beige); }
 .bt-mod-filter-help b { color: var(--bt-white); }
 .bt-mod-filter-help-note { margin-top: 6px; color: var(--bt-gray-alt); }
-.bt-mod-filter-scan { display: flex; align-items: center; margin-top: 5px; }
+.bt-mod-filter-scan { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; margin-top: 5px; }
+.bt-mod-filter-scan-trailing { display: flex; margin-left: auto; }
+.bt-mod-filter-scan-trailing .bt-button { height: 26px; white-space: nowrap; }
 .bt-mod-filter-scan-button { flex: 0 0 auto; height: 26px; padding: 0 10px; border: 0; background-color: var(--bt-blue); font-size: 12px; color: var(--bt-white); cursor: pointer; }
 .bt-mod-filter-scan-button + .bt-mod-filter-scan-button { margin-left: 4px; }
 .bt-mod-filter-scan-button:hover { background-color: var(--bt-blue-alt); }
 .bt-mod-filter-scan-button[disabled] { opacity: 0.5; cursor: default; }
-.bt-mod-filter-scan-line { min-height: 16px; margin-top: 4px; }
+.bt-mod-filter-scan-line { margin-top: 4px; }
 .bt-mod-filter-scan-status { font-size: 12px; color: var(--bt-beige); }
 
 /* ---- Added to the trade page ----------------------------------------------------- */
@@ -453,14 +456,14 @@ div.row[bt-regroup-state='visible'] { background: rgba(16, 16, 16, 0.8) !importa
 
 /* Collapsible groups (Pseudo, Explicit, Implicit...) in the "+ Add Stat Filter" list: arrow, heading and hint
    on one centred line. Which groups are hidden is set by src/features/collapsible-stat-groups.ts. */
-.filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li [class*="mutate-type-"]) > .multiselect__option--disabled {
+.bt-collapsible-stat-groups .filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li [class*="mutate-type-"]) > .multiselect__option--disabled {
   display: flex !important;
   align-items: center;
   gap: 6px;
   pointer-events: auto !important;
   cursor: pointer !important;
 }
-.filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li [class*="mutate-type-"]) > .multiselect__option--disabled::before {
+.bt-collapsible-stat-groups .filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li [class*="mutate-type-"]) > .multiselect__option--disabled::before {
   content: '\25be';
   flex: 0 0 auto;
   width: 1em;
@@ -469,7 +472,7 @@ div.row[bt-regroup-state='visible'] { background: rgba(16, 16, 16, 0.8) !importa
   text-align: center;
   transform: translateY(-1px); /* the arrow glyph sits a little low */
 }
-.filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li [class*="mutate-type-"]) > .multiselect__option--disabled::after {
+.bt-collapsible-stat-groups .filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li [class*="mutate-type-"]) > .multiselect__option--disabled::after {
   content: '(click to hide)' !important;
   position: static !important;
   flex: 0 0 auto;

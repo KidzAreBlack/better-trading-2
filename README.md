@@ -12,7 +12,15 @@ single codebase. It keeps the original's look and adds a few search tools on top
 ## Features
 
 - **Bookmarks**: folders of saved searches, drag to reorder, archive, delete, export/share strings and a
-  backup file. Backup files and share strings from the original Better Trading import as-is.
+  backup file. Backup files and share strings from the original Better Trading import as-is. Bookmarks don't
+  save the trade mode: they (and History links) open in whichever mode you're using, In Person or Instant Buyout.
+- **Add build**: paste a Path of Building code or a pobb.in link and get a bookmark folder with a trade search
+  for every item the build wears (gear, flasks and jewels). If the build has several item sets (Leveling,
+  Endgame…), pick which one to use. Uniques are searched by name plus the mods of the version the build uses (no values, so any roll
+  matches); other items by their mods, with minimums at a percentage of the build's values (80% by default). Example items are handled too:
+  rare names are never searched for, an invented base falls back to the slot's item type, and a unique that
+  doesn't exist is searched by its mods. Searches are built locally, so importing never uses up the trade
+  site's search limit.
 - **History** of the searches you run, shown as plain text, and **pinned items** for comparing results.
 - **Result extras**: equivalent prices from poe.ninja (PoE 1), **highlight searched mods** (a setting, with a
   colour picker), body-armour socket warning, grouping of identical listings.
@@ -22,10 +30,10 @@ single codebase. It keeps the original's look and adds a few search tools on top
     Category and fills in the min value (PoE 1).
     - **Advanced filtering**: a box that hides loaded results by mod tier or name (`p1`, `t2+`,
       `wizard`, `spell damage p2`), with **Load all** (the site shows up to 100 per search) and **Next 100** (continues from the last price).
+  - **Stat filters are collapsible**: click a group's heading (Pseudo, Explicit, Implicit, Fractured…) in the
+    "+ Add Stat Filter" list to hide or show its stats.
   - **Item rarity starts on Any Non-Unique**.
   - **Show panel when hovering the icon**.
-- **Collapsible groups** (Pseudo, Explicit, Implicit, Fractured…) in the "+ Add Stat Filter" list: click a
-  group's heading to hide or show it.
 - The trade page is resized to sit beside the sidebar instead of under it.
 
 ## Install
@@ -54,8 +62,8 @@ Store links will be added here once the listings are approved:
 - *Permanently*: regular Firefox only installs add-ons signed by Mozilla, so install from Firefox Add-ons.
   To sign your own copy, upload the Firefox zip to addons.mozilla.org as an unlisted add-on.
 
-On first install, both browsers ask for access to `pathofexile.com` (where the sidebar runs) and
-`poe.ninja` (prices). In Firefox you can revoke these in `about:addons`; prices then stop showing.
+On first install, both browsers ask for access to `pathofexile.com` (where the sidebar runs),
+`poe.ninja` (prices) and `pobb.in` (Add build links). In Firefox you can revoke these in `about:addons`; prices then stop showing.
 
 ### Moving bookmarks from the original Better Trading
 
@@ -108,7 +116,8 @@ data with `python3 scripts/build-tier-data.py <RePoE data folder> assets/data/po
 - `src/main.tsx`: the entry point. `src/ui` holds the sidebar, `src/lib` storage, bookmarks, history and
   settings, `src/features` the search tools, `src/enhancers` the result extras, and `src/content.css`
   all styles.
-- `src/background.ts`: fetches poe.ninja prices for the page (content scripts cannot call it directly).
+- `src/background.ts`: fetches poe.ninja prices and pobb.in builds for the page (content scripts cannot
+  call other sites directly). `src/lib/pob-import.ts` turns a Path of Building build into searches.
 - `build.mjs`: the build and both manifests. `scripts/package.mjs`: the release zips.
 - `tests/`: integration tests run with jsdom.
 

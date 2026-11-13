@@ -1,3 +1,4 @@
+import type {ComponentChildren} from 'preact';
 import {useEffect, useRef, useState} from 'preact/hooks';
 import {getModFilterQuery, onModFilterChange, setModFilterQuery} from '../features/mod-filter';
 import {clickSearch, computeNextMin, findPriceFilter, getResultRows, readRowPrice, toFilterCurrency} from '../features/next-page';
@@ -15,7 +16,9 @@ let originalMin: string | null = null;
 
 // The "Tier search" box: filter loaded results by mod tier or name, load all
 // results of a search, and move on to the next 100 by price.
-export function ModFilter() {
+// `trailing`: buttons shown at the right end of the Load all / Next 100 row (the Bookmarks
+// page puts "Collapse folders" there).
+export function ModFilter(props: {trailing?: ComponentChildren} = {}) {
   const [query, setQuery] = useState(getModFilterQuery());
   const [counts, setCounts] = useState({shown: 0, total: 0});
   const [isBusy, setIsBusy] = useState(false);
@@ -198,16 +201,18 @@ export function ModFilter() {
             Back to start
           </button>
         )}
+        {props.trailing && <div class="bt-mod-filter-scan-trailing">{props.trailing}</div>}
       </div>
 
-      <div class="bt-mod-filter-scan-line">
-        {message && (
+      {/* Only takes up room while there is something to say ("Loaded 90 more..."). */}
+      {message && (
+        <div class="bt-mod-filter-scan-line">
           <span class="bt-mod-filter-scan-status">
             {page > 1 ? `Page ${page}: ` : ''}
             {message}
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {showHelp && (
         <div class="bt-mod-filter-help">

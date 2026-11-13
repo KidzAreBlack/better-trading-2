@@ -25,9 +25,11 @@ and they go only where you put them.
 
 - **poe.ninja** (`https://poe.ninja`): to show equivalent prices, the extension downloads public
   currency price lists. The request contains only the league name and price category, nothing about you.
+- **pobb.in** (`https://pobb.in`): only when you use **Add build** with a pobb.in link, the extension
+  downloads that build's Path of Building code from pobb.in. Nothing about you is sent.
 - **pathofexile.com**: the extension runs on the trade site's pages and reads them to add its tools.
   When you use **Load all** or **Next 100**, it presses the site's own buttons and runs searches
-  just as you would. It sends nothing elsewhere.
+  just as you would. **Add build** reads the site's public stat and item lists to build its searches. It sends nothing elsewhere.
 - **web.poecdn.com**: currency icons shown next to prices are loaded from Grinding Gear Games'
   image server, the same images the trade site itself uses.
 
@@ -38,6 +40,7 @@ There is no analytics, tracking, advertising or remote code.
 - `storage`: keeps your bookmarks, history and the price cache.
 - Access to `www.pathofexile.com/trade*`: shows the sidebar and search tools on the trade site.
 - Access to `poe.ninja`: downloads public price data for equivalent prices.
+- Access to `pobb.in`: downloads a shared build when you paste a pobb.in link into **Add build**.
 
 ## Contact
 

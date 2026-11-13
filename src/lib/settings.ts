@@ -9,6 +9,7 @@ export const SETTINGS = {
   // Sub-option of Tier search: the result filter box, Load all / Next 100, and the link from the tier picker.
   'advanced-filtering': {label: 'Advanced filtering', defaultOn: false},
   'highlight-stat-filters': {label: 'Highlight searched mods', defaultOn: true},
+  'collapsible-stat-groups': {label: 'Stat filters are collapsible', defaultOn: false},
   'default-non-unique': {label: 'Item rarity starts on Any Non-Unique', defaultOn: false},
   'hover-open': {label: 'Show panel when hovering the icon', defaultOn: false},
   // "Enabled item result enhancers" on the About page
@@ -17,7 +18,7 @@ export const SETTINGS = {
   'regroup-similars': {label: 'Regroup similar results', defaultOn: true},
 } as const;
 
-export const SETTINGS_TAB_KEYS = ['fuzzy-search', 'tier-search', 'highlight-stat-filters', 'default-non-unique', 'hover-open'] as const;
+export const SETTINGS_TAB_KEYS = ['fuzzy-search', 'tier-search', 'highlight-stat-filters', 'collapsible-stat-groups', 'default-non-unique', 'hover-open'] as const;
 export const ENHANCER_KEYS = ['equivalent-pricings', 'maximum-sockets', 'regroup-similars'] as const;
 
 export type SettingKey = keyof typeof SETTINGS;

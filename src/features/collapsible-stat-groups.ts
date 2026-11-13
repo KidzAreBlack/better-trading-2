@@ -1,8 +1,11 @@
 import {local} from '../lib/ext';
+import {isEnabled} from '../lib/settings';
+import {on} from '../lib/util';
 
 // Makes every group in the "+ Add Stat Filter" list collapsible (Pseudo, Explicit,
 // Implicit, Fractured, Enchant, Crafted...): click a group's heading to hide or show
-// its stats. Which groups are hidden is remembered.
+// its stats. Which groups are hidden is remembered. Only active while the
+// "Stat filters are collapsible" setting is on.
 //
 // The look of the headings is plain CSS (src/content.css). Hiding is done by a small
 // stylesheet built here from the hidden groups, so it keeps working while the site
@@ -16,6 +19,9 @@ const STAT_SELECT_SELECTOR = '.filter-select-mutate';
 const MAX_SKIPS = 600;
 
 const collapsed = new Set<string>();
+const ACTIVE_CLASS = 'bt-collapsible-stat-groups';
+
+const isActive = () => isEnabled('collapsible-stat-groups');
 
 // The group a stat belongs to, from its "mutate-type-<group>" label class.
 const groupOfItem = (item: Element | null): string | null => {
@@ -35,9 +41,9 @@ const isHiddenItem = (item: Element | null) => {
 // Group names come from the site's class names; keep only safe characters for CSS.
 const cssName = (group: string) => group.replace(/[^a-zA-Z0-9_-]/g, '');
 
-// "html body" makes these rules win over the default heading style in content.css.
+// "html body.bt-collapsible-stat-groups" makes these rules win over the default heading style in content.css.
 const HEADING = (group: string) =>
-  `html body .filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li .mutate-type-${group}) > .multiselect__option--disabled`;
+  `html body.bt-collapsible-stat-groups .filter-select-mutate li.multiselect__element:has(> .multiselect__option--disabled):has(+ li .mutate-type-${group}) > .multiselect__option--disabled`;
 
 const render = () => {
   let style = document.getElementById(STYLE_ID);
@@ -47,14 +53,21 @@ const render = () => {
     document.head.appendChild(style);
   }
 
+  // Setting off: headings look and behave like the site's own, and nothing is hidden.
+  document.body.classList.toggle(ACTIVE_CLASS, isActive());
+  if (!isActive()) {
+    style.textContent = '';
+    return;
+  }
+
   style.textContent = Array.from(collapsed)
     .map(cssName)
     .filter(Boolean)
     .map(
       (group) =>
-        `html body .filter-select-mutate li.multiselect__element:has(.mutate-type-${group}) { display: none !important; }\n` +
+        `html body.bt-collapsible-stat-groups .filter-select-mutate li.multiselect__element:has(.mutate-type-${group}) { display: none !important; }\n` +
         `${HEADING(group)}::before { content: '\\25b8'; }\n` +
-        `${HEADING(group)}::after { content: '(hidden, click to show)' !important; }`
+        `${HEADING(group)}::after { content: '(click to show)' !important; }`
     )
     .join('\n');
 };
@@ -79,7 +92,7 @@ const load = () => {
 const handleClick = (event: Event) => {
   const target = event.target as Element | null;
   const heading = target && target.closest ? target.closest('.multiselect__option--disabled') : null;
-  if (!heading || !heading.closest(STAT_SELECT_SELECTOR)) return;
+  if (!isActive() || !heading || !heading.closest(STAT_SELECT_SELECTOR)) return;
 
   const group = groupOfItem(heading.closest('li')?.nextElementSibling ?? null);
   if (!group) return;
@@ -127,7 +140,7 @@ const skipHiddenHighlight = async (input: HTMLInputElement, key: string) => {
 };
 
 const handleKeyboard = (event: Event) => {
-  if (isSkipping || collapsed.size === 0) return;
+  if (isSkipping || collapsed.size === 0 || !isActive()) return;
 
   const input = event.target as HTMLInputElement | null;
   if (!input || !input.classList || !input.classList.contains('multiselect__input')) return;
@@ -143,6 +156,7 @@ const handleKeyboard = (event: Event) => {
 export default function setupCollapsibleStatGroups() {
   load();
   render();
+  on('settings-change', render);
 
   document.addEventListener('click', handleClick, true);
   document.addEventListener('keydown', handleKeyboard, true);
