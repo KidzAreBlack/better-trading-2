@@ -684,9 +684,9 @@ const TRADE_DATA = {
     {id: 'crafted', entries: [{id: 'crafted.stat_gems', text: '+# to Level of Socketed Gems'}]},
   ]},
   items: {result: [
-    {id: 'armour', entries: [{type: 'Hubris Circlet'}, {type: 'Glorious Plate'}, {name: "Kaom's Heart", type: 'Glorious Plate'}]},
+    {id: 'armour', entries: [{type: 'Hubris Circlet'}, {type: 'Glorious Plate'}, {name: "Kaom's Heart", type: 'Glorious Plate'}, {type: 'Girded Tower Shield'}, {name: 'Svalinn', type: 'Girded Tower Shield'}]},
     {id: 'weapon', entries: [{type: 'Spine Bow'}]},
-    {id: 'jewel', entries: [{type: 'Viridian Jewel'}]},
+    {id: 'jewel', entries: [{type: 'Viridian Jewel'}, {type: 'Large Cluster Jewel'}]},
     {id: 'flask', entries: [{type: 'Divine Life Flask'}]},
   ]},
 };
@@ -959,4 +959,60 @@ test('About has no settings; every result option in Settings turns on and off at
   assert.equal(first.querySelectorAll('.bt-pin-button').length, 1);
   assert.equal(first.querySelectorAll('.bt-mod-buttons').length, first.querySelectorAll('.item-mod [data-field^="stat."]').length);
   window.close();
+});
+
+// Shaped like a real build: two loadouts ("95" open, "Endgame"), each with its own tree and jewels.
+const LOADOUT_XML = `<PathOfBuilding>
+<Build className="Witch" ascendClassName="Elementalist" level="95"/>
+<Tree activeSpec="1">
+<Spec title="95"><Sockets><Socket nodeId="1" itemId="12"/></Sockets></Spec>
+<Spec title="Endgame"><Sockets><Socket nodeId="1" itemId="11"/><Socket nodeId="2" itemId="11"/><Socket nodeId="3" itemId="0"/></Sockets></Spec>
+</Tree>
+<Items activeItemSet="1">
+<Item id="10">Rarity: RELIC
+Svalinn
+Girded Tower Shield
+Implicits: 0
++(30-40)% to Fire Resistance</Item>
+<Item id="11">Rarity: RARE
+Cluster Name
+Large Cluster Jewel
+Implicits: 0
+7% increased maximum Life</Item>
+<Item id="12">Rarity: RARE
+Old Jewel
+Viridian Jewel
+Implicits: 0
+7% increased maximum Life</Item>
+<Item id="13">Rarity: RARE
+Old Cap
+Hubris Circlet
+Implicits: 0
++40 to maximum Energy Shield</Item>
+<ItemSet id="1" title="95"><Slot name="Helmet" itemId="13"/></ItemSet>
+<ItemSet id="2" title="Endgame"><Slot name="Weapon 2" itemId="10"/></ItemSet>
+</Items>
+</PathOfBuilding>`;
+const LOADOUT_CODE = deflateSync(Buffer.from(LOADOUT_XML)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+
+test('Add build: a loadout brings its own tree jewels; Relics search as uniques', async () => {
+  const {document, window, store} = await load({onFetch: tradeData, nodeStreams: true});
+  click(button(document, 'Add build'));
+  await sleep(30);
+  type(document.querySelector('.bt-modal-container input'), LOADOUT_CODE);
+  await sleep(500);
+  assert.match(document.querySelector('.bt-modal-container').textContent, /Loadout/);
+  assert.equal(document.querySelector('.bt-build-import-set').selectedOptions[0].textContent, '95', 'the build\'s open loadout is picked first');
+  click(document.querySelector('.bt-modal-overlay'));
+  await sleep(30);
+
+  await addBuild(document, window, LOADOUT_CODE, 'Endgame');
+  const folder = store['bookmark-folders'].value[0];
+  assert.equal(folder.title, 'Elementalist (level 95) \u2013 Endgame');
+  const trades = store[`bookmark-trades--${folder.id}`].value;
+  // Endgame's shield, and Endgame's jewel once (it sits in two sockets); not the "95" tree's jewel.
+  assert.deepEqual(trades.map((t) => t.title), ['Weapon: Svalinn', 'Jewel: Cluster Name (Large Cluster Jewel)']);
+  const shield = decodeSlug(trades[0].location.slug);
+  assert.equal(shield.name, 'Svalinn');
+  assert.equal(shield.type, 'Girded Tower Shield');
 });

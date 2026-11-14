@@ -77,7 +77,9 @@ const parseItem = (slot: string, text: string): BuildItem | null => {
   const lines = text.split('\n').map((line) => line.trim()).filter(Boolean);
   const rarityLine = lines.find((line) => line.startsWith('Rarity:'));
   if (!rarityLine) return null;
-  const rarity = rarityLine.slice(7).trim().toUpperCase();
+  // A Relic is a foil unique: searched like any unique (the trade site lists both under its name).
+  const shownRarity = rarityLine.slice(7).trim().toUpperCase();
+  const rarity = shownRarity === 'RELIC' ? 'UNIQUE' : shownRarity;
   const start = lines.indexOf(rarityLine) + 1;
   const name = lines[start] || '';
   const base = rarity === 'RARE' || rarity === 'UNIQUE' ? lines[start + 1] || '' : name;
@@ -118,12 +120,34 @@ export interface ItemSetChoice {
   title: string;
 }
 
-// The build's item sets ("Leveling", "Endgame"...), and the one the build has selected.
+// Path of Building groups a tree, an item set, a skill set and a config set into a loadout
+// when they share a name ("Endgame"), or share a {tag} in their names ("Endgame {2}").
+const loadoutName = (title: string) => title.replace(/\{[^}]*\}/g, '').replace(/\s+/g, ' ').trim();
+const loadoutTags = (title: string) => (title.match(/\{([^}]*)\}/g) || []).flatMap((tag) => tag.slice(1, -1).split(',').map((part) => part.trim())).filter(Boolean);
+
+// The tree of the loadout an item set belongs to (it holds that loadout's jewels), or the
+// build's open tree when no tree matches.
+const loadoutSpec = (doc: Document, setTitle: string): Element | undefined => {
+  const tree = doc.querySelector('Tree');
+  const specs = tree ? Array.from(tree.querySelectorAll(':scope > Spec')) : [];
+  const title = (spec: Element) => spec.getAttribute('title') || '';
+  const tags = loadoutTags(setTitle);
+  const name = loadoutName(setTitle).toLowerCase();
+
+  return (
+    (tags.length ? specs.find((spec) => loadoutTags(title(spec)).some((tag) => tags.includes(tag))) : undefined) ||
+    (name ? specs.find((spec) => loadoutName(title(spec)).toLowerCase() === name) : undefined) ||
+    specs[parseInt(tree?.getAttribute('activeSpec') || '1', 10) - 1] ||
+    specs[0]
+  );
+};
+
+// The build's loadouts, from its item sets ("Leveling", "Endgame"...), and the one the build has selected.
 export const listItemSets = (doc: Document): {sets: ItemSetChoice[]; active: string} => {
   const itemsNode = doc.querySelector('Items');
   const sets = Array.from(itemsNode?.querySelectorAll(':scope > ItemSet') || []).map((set, index) => {
     const id = set.getAttribute('id') || String(index + 1);
-    return {id, title: (set.getAttribute('title') || '').trim() || `Item set ${id}`};
+    return {id, title: loadoutName(set.getAttribute('title') || '') || `Item set ${id}`};
   });
   const active = itemsNode?.getAttribute('activeItemSet') || sets[0]?.id || '1';
   return {sets, active};
@@ -146,13 +170,15 @@ export const readBuild = (doc: Document, setId?: string): Build => {
     if (id !== '0' && !/Swap/.test(name)) slots.push([name, id]);
   });
 
-  // Jewels socketed in the active passive tree.
-  const tree = doc.querySelector('Tree');
-  const specs = tree ? Array.from(tree.querySelectorAll(':scope > Spec')) : [];
-  const spec = specs[parseInt(tree?.getAttribute('activeSpec') || '1', 10) - 1] || specs[0];
+  // Jewels socketed in the same loadout's passive tree. A jewel the build uses in several
+  // sockets (the same cluster jewel, say) gets one search.
+  const spec = set && set !== itemsNode ? loadoutSpec(doc, set.getAttribute('title') || '') : loadoutSpec(doc, '');
+  const seen = new Set(slots.map(([, id]) => id));
   spec?.querySelectorAll('Sockets > Socket').forEach((socket) => {
     const id = socket.getAttribute('itemId') || '0';
-    if (id !== '0') slots.push(['Jewel', id]);
+    if (id === '0' || seen.has(id)) return;
+    seen.add(id);
+    slots.push(['Jewel', id]);
   });
 
   const items = slots
@@ -414,7 +440,7 @@ export const loadBuild = async (input: string): Promise<Document | string> => {
 // Step 2: make the folder and its searches from the chosen item set.
 export const createBuildFolder = async (doc: Document, version: TradeSiteVersion, minPercent: number, setId?: string): Promise<ImportedBuild | string> => {
   const build = readBuild(doc, setId);
-  if (!build.items.length) return 'This item set has no equipped items.';
+  if (!build.items.length) return 'This loadout has no equipped items.';
 
   let index: StatIndex;
   let data: ItemData;

@@ -548,7 +548,7 @@ function BuildImport(props: {version: TradeSiteVersion; onCancel: () => void; on
     const result = await createBuildFolder(build, props.version, minPercent, setId || undefined);
     setIsWorking(false);
     if (typeof result === 'string') setError(result);
-    else if (!result.trades.length) setError('No searches could be made from this item set.');
+    else if (!result.trades.length) setError('No searches could be made from this loadout.');
     else props.onSubmit(result.folder, result.trades);
   };
 
@@ -557,7 +557,7 @@ function BuildImport(props: {version: TradeSiteVersion; onCancel: () => void; on
       <Form canSubmit={Boolean(build) && !isWorking} onSubmit={() => void submit()}>
         <Input label="Path of Building code or pobb.in link" autofocus onChange={setInput} />
         {sets.length > 1 && (
-          <Field label="Item set">
+          <Field label="Loadout">
             <select class="bt-form-input bt-build-import-set" value={setId} onChange={(event) => setSetId((event.target as HTMLSelectElement).value)}>
               {sets.map((set) => (
                 <option key={set.id} value={set.id}>

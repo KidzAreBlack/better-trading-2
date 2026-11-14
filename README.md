@@ -15,8 +15,8 @@ single codebase. It keeps the original's look and adds a few search tools on top
   backup file. Backup files and share strings from the original Better Trading import as-is. Bookmarks don't
   save the trade mode: they (and History links) open in whichever mode you're using, In Person or Instant Buyout.
 - **Add build**: paste a Path of Building code or a pobb.in link and get a bookmark folder with a trade search
-  for every item the build wears (gear, flasks and jewels). If the build has several item sets (Leveling,
-  Endgame…), pick which one to use. Uniques are searched by name plus the mods of the version the build uses (no values, so any roll
+  for every item the build wears (gear, flasks and jewels). If the build has several loadouts (Leveling,
+  Endgame…), pick which one to use: its gear and the jewels in its own passive tree are searched. Uniques are searched by name plus the mods of the version the build uses (no values, so any roll
   matches); other items by their mods, with minimums at a percentage of the build's values (80% by default). Example items are handled too:
   rare names are never searched for, an invented base falls back to the slot's item type, and a unique that
   doesn't exist is searched by its mods. Searches are built locally, so importing never uses up the trade
