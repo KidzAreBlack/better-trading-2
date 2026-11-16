@@ -163,7 +163,7 @@ export function ModFilter(props: {trailing?: ComponentChildren} = {}) {
         <input
           type="text"
           class={`bt-mod-filter-input ${isActive ? 'is-active' : ''}`}
-          placeholder="Filter results by mod tier / name"
+          placeholder="Filter results by mod tier / name / regex"
           value={query}
           onInput={(event) => updateQuery((event.target as HTMLInputElement).value)}
         />
@@ -222,6 +222,10 @@ export function ModFilter(props: {trailing?: ComponentChildren} = {}) {
           <div><b>p3+</b> &mdash; a prefix of tier 3 or better</div>
           <div><b>spell damage p2</b> &mdash; one mod with "spell damage" that is P2</div>
           <div><b>wizard, s1</b> &mdash; use commas, the item must match every part</div>
+          <div class="bt-mod-filter-help-title">Regex (map regexes work as in game)</div>
+          <div><b>"pack.*[2-9]\d%"</b> &mdash; every pattern must match (spaces separate them, quotes keep spaces in)</div>
+          <div><b>"!ele|refl"</b> &mdash; <b>!</b> = must not match, <b>|</b> = either one</div>
+          <div class="bt-mod-filter-help-note">Regex checks the whole item: name, properties (Item Quantity, Pack Size...) and mods.</div>
           <div class="bt-mod-filter-help-note">Only filters results already loaded on the page. Use the scan button to load more.</div>
         </div>
       )}

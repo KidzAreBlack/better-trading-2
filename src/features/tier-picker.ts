@@ -425,16 +425,23 @@ const openPopup = (button: HTMLElement, row: Element) => {
 
 // ---- Buttons on the stat filter rows ---------------------------------------
 
+// Whether the buttons were removed after Tier search was turned off (so it isn't done
+// again on every page change).
+let isCleared = false;
+
 const refreshButtons = () => {
   scheduled = false;
-  syncLinksWithPage();
 
   if (!isEnabled('tier-search') || !isSupportedSite()) {
-    document.querySelectorAll(`.${BUTTON_CLASS}`).forEach((button) => button.remove());
-    closePopup();
-
+    if (!isCleared) {
+      document.querySelectorAll(`.${BUTTON_CLASS}`).forEach((button) => button.remove());
+      closePopup();
+      isCleared = true;
+    }
     return;
   }
+  isCleared = false;
+  syncLinksWithPage();
 
   if (dataState !== 'ready') return loadData();
 
@@ -484,7 +491,7 @@ const showSelectedTier = (button: Element, statText: string) => {
 };
 
 const scheduleRefresh = () => {
-  if (scheduled) return;
+  if (scheduled || (isCleared && !isEnabled('tier-search'))) return;
   scheduled = true;
   window.requestAnimationFrame(refreshButtons);
 };
@@ -492,9 +499,13 @@ const scheduleRefresh = () => {
 export default function setupTierPicker() {
   onPageChange(scheduleRefresh);
 
-  on('settings-change', scheduleRefresh);
+  on('settings-change', () => {
+    isCleared = false;
+    scheduleRefresh();
+  });
   on('mod-filter-query', syncLinksWithQuery);
   document.addEventListener('input', (event) => {
+    if (!isEnabled('tier-search')) return;
     if (event.target instanceof HTMLInputElement && event.target.classList.contains('minmax')) syncLinksWithPage();
   });
   scheduleRefresh();

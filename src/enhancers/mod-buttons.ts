@@ -9,7 +9,6 @@ import {isEnabled} from '../lib/settings';
 import {on} from '../lib/util';
 import {flash} from '../ui/common';
 
-const ACTIVE_CLASS = 'bt-mod-buttons-on';
 const GROUP_NAMES = {and: 'And', not: 'Not'} as const;
 
 let nextKey = 1;
@@ -80,8 +79,15 @@ export const addModButtons = (row: Element): void => {
 };
 
 // Turning the setting off hides the buttons at once (they stay in the page, unused).
+// The buttons are only built while the setting is on: turning it on adds them to the
+// results already on the page, turning it off removes them.
 export const setupModButtons = (): void => {
-  const update = () => document.body.classList.toggle(ACTIVE_CLASS, isEnabled('mod-buttons'));
-  update();
-  on('settings-change', update);
+  let wasOn = isEnabled('mod-buttons');
+  on('settings-change', () => {
+    const isOn = isEnabled('mod-buttons');
+    if (isOn === wasOn) return;
+    wasOn = isOn;
+    if (isOn) document.querySelectorAll('.resultset > div.row[bt-enhanced]').forEach(addModButtons);
+    else document.querySelectorAll('.bt-mod-buttons').forEach((element) => element.remove());
+  });
 };

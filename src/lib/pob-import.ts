@@ -342,7 +342,8 @@ export const buildSearch = (item: BuildItem, index: StatIndex, data: ItemData, m
 
   const filters: Json[] = [];
   let skipped = 0;
-  const add = (lines: string[], preferred: string) => {
+  // `unticked`: added to the search but switched off (its box unticked), to tick if wanted.
+  const add = (lines: string[], preferred: string, unticked = false) => {
     for (let i = 0; i < lines.length; ) {
       // Some mods span two or three lines (flask immunities: "Grants Immunity to Bleeding... /
       // Grants Immunity to Corrupted Blood..."). The trade site lists those as one stat, so try
@@ -374,20 +375,30 @@ export const buildSearch = (item: BuildItem, index: StatIndex, data: ItemData, m
           : match.value <= 3
             ? Math.floor(match.value)
             : Math.floor((match.value * minPercent) / 100);
-      filters.push(min !== undefined && min > 0 ? {id: match.id, value: {min}} : {id: match.id});
+      const filter: Json = min !== undefined && min > 0 ? {id: match.id, value: {min}} : {id: match.id};
+      if (unticked) filter.disabled = true;
+      filters.push(filter);
     }
   };
+
+  // Implicits and enchantments are added unticked: they're often not what makes the item,
+  // but are there to tick. Cluster jewels keep theirs ticked (the enchant is the jewel's type).
+  const isEnchant = (line: string) => /\{enchant\}/.test(line);
+  const isCluster = /Cluster Jewel$/.test(item.base);
+  const enchants = item.explicits.filter(isEnchant);
+  const extras = [...item.implicits, ...enchants];
   if (isRealUnique) {
-    // A unique's own mods tell its versions apart. Its implicits come from the base, and
-    // crafted or enchanted lines were added by the player, so those are left out.
+    // A unique's own mods tell its versions apart. Crafted lines were added by the player, so
+    // they're left out; implicits and enchantments are added unticked.
     add(item.explicits.filter((line) => !/\{(crafted|enchant)\}/.test(line)), 'explicit');
+    add(extras, 'implicit', true);
     const query: Json = {name: item.name, type: item.base};
     if (filters.length) query.stats = [{type: 'and', filters}];
     return {title: `${label}: ${item.name}`, query, matched: filters.length, skipped};
   }
 
-  add(item.implicits, 'implicit');
-  add(item.explicits, 'explicit');
+  add(item.explicits.filter((line) => !isEnchant(line)), 'explicit');
+  add(extras, 'implicit', !isCluster);
 
   // A placeholder unique ("any unique with these mods") is searched without the rarity limit.
   const typeFilters: Json = item.rarity === 'UNIQUE' ? {} : {rarity: {option: 'nonunique'}};
@@ -463,7 +474,7 @@ export const createBuildFolder = async (doc: Document, version: TradeSiteVersion
   const {sets, active} = listItemSets(doc);
   const setTitle = sets.length > 1 ? sets.find((set) => set.id === (setId || active))?.title : undefined;
   const who = build.ascendancy && build.ascendancy !== 'None' ? build.ascendancy : build.className || 'Build';
-  const title = `${who}${build.level ? ` (level ${build.level})` : ''}${setTitle ? ` \u2013 ${setTitle}` : ''}`;
+  const title = `${who}${setTitle ? ` \u2013 ${setTitle}` : ''}`;
 
   return {folder: {title, version, icon: folderIcon(version, build.ascendancy), archivedAt: null}, trades, skippedMods};
 };

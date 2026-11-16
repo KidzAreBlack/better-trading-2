@@ -10,18 +10,26 @@ export const SETTINGS = {
   'highlight-stat-filters': {label: 'Highlight searched mods', defaultOn: true},
   'collapsible-stat-groups': {label: 'Stat filters are collapsible', defaultOn: false},
   'default-non-unique': {label: 'Item rarity starts on Any Non-Unique', defaultOn: false},
+  'sticky-search': {label: 'Keep the search bar on screen while scrolling', defaultOn: false},
   'hover-open': {label: 'Show panel when hovering the icon', defaultOn: false},
+  'auto-backup': {label: 'Back up bookmarks automatically (Downloads/Better Trading 2)', defaultOn: true},
   'equivalent-pricings': {label: 'Equivalent prices (from poe.ninja)', defaultOn: true},
-  'maximum-sockets': {label: 'Warning for body armours that cannot be 6-socketed', defaultOn: true},
   'regroup-similars': {label: 'Group identical listings from the same seller', defaultOn: true},
+  'price-summary': {label: 'Price summary above the results (lowest / median / highest)', defaultOn: false},
   'mod-buttons': {label: 'Plus / Minus buttons on result mods', defaultOn: true},
+  // Which tabs the panel shows (Settings always shows).
+  'tab-bookmarks': {label: 'Bookmarks', defaultOn: true},
+  'tab-pinned-items': {label: 'Pinned items', defaultOn: false},
+  'tab-bulk': {label: 'Bulk', defaultOn: true},
+  'tab-history': {label: 'History', defaultOn: true},
 } as const;
 
 // The Settings tab, in groups.
 export const SETTINGS_SECTIONS = [
-  {title: 'Search form', keys: ['fuzzy-search', 'tier-search', 'collapsible-stat-groups', 'default-non-unique']},
-  {title: 'Results', keys: ['highlight-stat-filters', 'mod-buttons', 'equivalent-pricings', 'maximum-sockets', 'regroup-similars']},
-  {title: 'Panel', keys: ['hover-open']},
+  {title: 'Search form', keys: ['fuzzy-search', 'tier-search', 'collapsible-stat-groups', 'default-non-unique', 'sticky-search']},
+  {title: 'Results', keys: ['highlight-stat-filters', 'mod-buttons', 'equivalent-pricings', 'price-summary', 'regroup-similars']},
+  {title: 'Panel', keys: ['hover-open', 'auto-backup']},
+  {title: 'Tabs', keys: ['tab-bookmarks', 'tab-pinned-items', 'tab-bulk', 'tab-history']},
 ] as const;
 
 export type SettingKey = keyof typeof SETTINGS;
@@ -30,15 +38,29 @@ export type SettingKey = keyof typeof SETTINGS;
 // Advanced filtering only works while Tier search is on.
 export const isAdvancedFilteringOn = (): boolean => isEnabled('tier-search') && isEnabled('advanced-filtering');
 
-export const isEnabled = (key: SettingKey): boolean => {
-  const stored = local.get(`setting-${key}`);
-  if (stored === 'on') return true;
-  if (stored === 'off') return false;
+// Settings are checked very often (on every page change), so they're kept in memory and
+// only read from storage again when they change, here or in another trade tab.
+const cache = new Map<SettingKey, boolean>();
 
-  return SETTINGS[key].defaultOn;
+export const isEnabled = (key: SettingKey): boolean => {
+  const cached = cache.get(key);
+  if (cached !== undefined) return cached;
+
+  const stored = local.get(`setting-${key}`);
+  const value = stored === 'on' ? true : stored === 'off' ? false : SETTINGS[key].defaultOn;
+  cache.set(key, value);
+  return value;
 };
 
 export const setEnabled = (key: SettingKey, enabled: boolean): void => {
   local.set(`setting-${key}`, enabled ? 'on' : 'off');
+  cache.set(key, enabled);
   emit('settings-change');
 };
+
+// A setting changed in another trade tab: apply it here too.
+window.addEventListener('storage', (event) => {
+  if (event.key !== null && !event.key.startsWith('bt-setting-')) return;
+  cache.clear();
+  emit('settings-change');
+});

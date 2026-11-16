@@ -14,28 +14,45 @@ single codebase. It keeps the original's look and adds a few search tools on top
 - **Bookmarks**: folders of saved searches, drag to reorder, archive, delete, export/share strings and a
   backup file. Backup files and share strings from the original Better Trading import as-is. Bookmarks don't
   save the trade mode: they (and History links) open in whichever mode you're using, In Person or Instant Buyout.
+- **Automatic backup**: a few seconds after your bookmarks change, they're saved to
+  `Downloads/Better Trading 2/backup.txt` (one file, overwritten each time). Restore it with Backup tools >
+  Restore from file. Can be turned off in Settings.
 - **Add build**: paste a Path of Building code or a pobb.in link and get a bookmark folder with a trade search
   for every item the build wears (gear, flasks and jewels). If the build has several loadouts (Leveling,
   Endgame…), pick which one to use: its gear and the jewels in its own passive tree are searched. Uniques are searched by name plus the mods of the version the build uses (no values, so any roll
-  matches); other items by their mods, with minimums at a percentage of the build's values (80% by default). Example items are handled too:
+  matches); other items by their mods, with minimums at a percentage of the build's values (80% by default).
+  Implicits and enchantments are added too, but unticked, so you can switch them on (a cluster jewel's stay ticked). Example items are handled too:
   rare names are never searched for, an invented base falls back to the slot's item type, and a unique that
   doesn't exist is searched by its mods. Searches are built locally, so importing never uses up the trade
   site's search limit.
+- **Bulk**: sellers with more than one listing in the current search, most first. Each seller is a card
+  (click its heading to fold it) with each listing's price, **Find** (jump to the listing) and **Buy** (presses
+  the listing's own Travel to Hideout / Direct Whisper button).
 - **History** of the searches you run, shown as plain text, and **pinned items** for comparing results.
+- **Tabs**: choose which tabs the panel shows in Settings. Bookmarks, Bulk, History and Settings show by default;
+  Pinned items is off until you turn it on.
+- **Price summary** above the results: lowest, median and highest price of the loaded listings (filtered-out ones
+  left out), compared in Chaos / Divines with poe.ninja rates (PoE 1). A setting, off by default.
 - **Result extras**: equivalent prices from poe.ninja (PoE 1), **highlight searched mods** (a setting, with a
-  colour picker), body-armour socket warning, grouping of identical listings, and **+ / −** beside each mod
+  colour picker), grouping of identical listings, and **+ / −** beside each mod
   (on hover): **+** adds the mod to an **And** stat group in your search, **−** to a **Not** group (each group is
   made the first time, then reused). Click Search when ready. Turned on or off in Settings ("Plus / Minus buttons on result mods").
 - **Settings tab** (each one can be turned on or off):
-  - **Fuzzy search**: adds `~` as you type in the main search box and stat filter boxes.
+  - **Fuzzy search**: adds `~` when you start typing in an empty main search box or stat filter box (or type over
+    all of its text). Delete it and it stays deleted.
   - **Tier search**: a **T** button on each stat filter that lists the mod's tiers for the selected Item
     Category and fills in the min value (PoE 1). With Item Category set to Any, it uses the item named in the
     main search box (a base type such as "Hubris Circlet", or a word like "ring").
     - **Advanced filtering**: a box that hides loaded results by mod tier or name (`p1`, `t2+`,
-      `wizard`, `spell damage p2`), with **Load all** (the site shows up to 100 per search) and **Next 100** (continues from the last price).
+      `wizard`, `spell damage p2`), or by **regex** like the game's stash search, so map regexes (e.g. from
+      poe.re) work: `"y: \+([89]\d|\d{3})%" "!ele.*refl"`. Regex checks the whole item: name, properties
+      (Item Quantity, Pack Size…) and mods. With **Load all** (the site shows up to 100 per search) and
+      **Next 100** (continues from the last price).
   - **Stat filters are collapsible**: click a group's heading (Pseudo, Explicit, Implicit, Fractured…) in the
     "+ Add Stat Filter" list to hide or show its stats.
   - **Item rarity starts on Any Non-Unique**.
+  - **Keep the search bar on screen while scrolling** (off by default): the search form stays at the top while
+    you scroll the results, filters included when they're open (then it scrolls on its own if it's tall).
   - **Show panel when hovering the icon**.
 - The trade page is resized to sit beside the sidebar instead of under it.
 

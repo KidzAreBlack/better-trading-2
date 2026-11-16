@@ -6,7 +6,10 @@ import setupCollapsibleStatGroups from './features/collapsible-stat-groups';
 import setupDefaultRarity from './features/default-rarity';
 import setupSidebarScroll from './features/sidebar-scroll';
 import fitTradePage from './features/fit-trade-page';
+import setupAutoBackup from './features/auto-backup';
 import setupFuzzySearch from './features/fuzzy-search';
+import setupPriceSummary from './features/price-summary';
+import setupStickySearch from './features/sticky-search';
 import setupModFilter from './features/mod-filter';
 import setupTierPicker from './features/tier-picker';
 import {local} from './lib/ext';
@@ -38,10 +41,13 @@ const start = () => {
   setupDefaultRarity();
   setupSidebarScroll();
   setupEnhancers();
+  setupPriceSummary();
+  setupStickySearch();
   setupPageTitle();
 
   watchLocation();
   setupHistory();
+  setupAutoBackup();
   setupTradeModeTracking();
 };
 

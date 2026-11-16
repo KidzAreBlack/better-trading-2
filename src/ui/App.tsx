@@ -1,24 +1,29 @@
 import {useEffect, useRef, useState} from 'preact/hooks';
 import {assetUrl, local} from '../lib/ext';
-import {isEnabled} from '../lib/settings';
+import {isEnabled, type SettingKey} from '../lib/settings';
 import {Bookmarks} from './Bookmarks';
-import {FlashMessages} from './common';
+import {Bulk} from './Bulk';
+import {FlashMessages, useLoaded} from './common';
 import {FaIcon, type IconName} from './icons';
 import {About, History, PinnedItems, Settings} from './pages';
 
 const COLLAPSED_KEY = 'side-panel-collapsed';
 const PEEK_CLOSE_DELAY_MS = 350;
 
-const PAGES: {id: string; icon: IconName; label: string; component: () => preact.JSX.Element | null}[] = [
-  {id: 'bookmarks', icon: 'folder-open', label: 'Bookmarks', component: Bookmarks},
-  {id: 'pinned-items', icon: 'thumbtack', label: 'Pinned items', component: PinnedItems},
-  {id: 'history', icon: 'history', label: 'History', component: History},
+// Each tab but Settings can be turned off in Settings > Tabs.
+const PAGES: {id: string; icon: IconName; label: string; setting?: SettingKey; component: () => preact.JSX.Element | null}[] = [
+  {id: 'bookmarks', icon: 'folder-open', label: 'Bookmarks', setting: 'tab-bookmarks', component: Bookmarks},
+  {id: 'pinned-items', icon: 'thumbtack', label: 'Pinned', setting: 'tab-pinned-items', component: PinnedItems},
+  {id: 'bulk', icon: 'users', label: 'Bulk', setting: 'tab-bulk', component: Bulk},
+  {id: 'history', icon: 'history', label: 'History', setting: 'tab-history', component: History},
   {id: 'settings', icon: 'cog', label: 'Settings', component: Settings},
 ];
+const visiblePages = () => PAGES.filter((page) => !page.setting || isEnabled(page.setting));
 
 export function App() {
-  // Every newly opened page starts on Bookmarks.
-  const [pageId, setPageId] = useState('bookmarks');
+  // Every newly opened page starts on the first tab (Bookmarks unless it is turned off).
+  const pages = useLoaded(['settings-change'], visiblePages, visiblePages());
+  const [pageId, setPageId] = useState(pages[0].id);
   const [isAbout, setIsAbout] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(local.get(COLLAPSED_KEY) === 'true');
 
@@ -53,7 +58,9 @@ export function App() {
     setIsCollapsed(collapsed);
   };
 
-  const Page = PAGES.find((page) => page.id === pageId)!.component;
+  // A tab turned off while open falls back to the first one shown.
+  const Page = (pages.find((page) => page.id === pageId) || pages[0]).component;
+  const activeId = pages.some((page) => page.id === pageId) ? pageId : pages[0].id;
 
   return (
     <>
@@ -95,8 +102,8 @@ export function App() {
         ) : (
           <>
             <ul class="bt-root-page-menu">
-              {PAGES.map((page) => (
-                <li key={page.id} class={`bt-root-page-menu-item ${page.id === pageId ? 'is-active' : ''}`} onClick={() => setPageId(page.id)}>
+              {pages.map((page) => (
+                <li key={page.id} class={`bt-root-page-menu-item ${page.id === activeId ? 'is-active' : ''}`} onClick={() => setPageId(page.id)}>
                   <FaIcon icon={page.icon} class="bt-root-page-menu-item-icon" />
                   {page.label}
                 </li>

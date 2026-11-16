@@ -38,6 +38,8 @@ There is no analytics, tracking, advertising or remote code.
 ## Permissions
 
 - `storage`: keeps your bookmarks, history and the price cache.
+- `downloads`: saves the automatic bookmark backup to `Downloads/Better Trading 2/backup.txt` on your
+  computer (a setting, on by default). Nothing is uploaded anywhere.
 - Access to `www.pathofexile.com/trade*`: shows the sidebar and search tools on the trade site.
 - Access to `poe.ninja`: downloads public price data for equivalent prices.
 - Access to `pobb.in`: downloads a shared build when you paste a pobb.in link into **Add build**.

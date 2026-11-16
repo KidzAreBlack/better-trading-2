@@ -1,8 +1,9 @@
 import {isEnabled} from '../lib/settings';
 
-// Fuzzy search: automatically puts "~" in front of what you type in the
-// trade site's main search box and in the stat filter boxes.
-// (On the trade site, a leading "~" turns on fuzzy matching.)
+// Fuzzy search: puts "~" in front of what you type in the trade site's main search
+// box and in the stat filter boxes. (On the trade site, a leading "~" turns on fuzzy
+// matching.) It is only added when you start typing in an empty box, so if you
+// delete the "~" it stays deleted.
 
 const FUZZY_PREFIX = '~';
 
@@ -23,6 +24,26 @@ const isStatFilterInput = (input: HTMLInputElement) => {
   return Boolean(input.closest('.filter-group-body')) && !input.closest('.filter-group-header');
 };
 
+// Whether each box was empty just before the current change. Text that is all
+// selected counts as empty: typing replaces all of it.
+const wasEmpty = new WeakMap<HTMLInputElement, boolean>();
+
+const isAllSelected = (input: HTMLInputElement) => {
+  try {
+    return input.selectionStart === 0 && input.selectionEnd === input.value.length;
+  } catch (_error) {
+    return false;
+  }
+};
+
+const handleBeforeInput = (event: Event) => {
+  if (!isEnabled('fuzzy-search')) return;
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement)) return;
+  const replacesAll = /^insert/.test((event as InputEvent).inputType || 'insertText') && isAllSelected(input);
+  wasEmpty.set(input, input.value === '' || replacesAll);
+};
+
 const handleInput = (event: Event) => {
   if ((event as InputEvent).isComposing) return;
 
@@ -33,6 +54,8 @@ const handleInput = (event: Event) => {
 
   const value = input.value;
   if (!value || value.startsWith(FUZZY_PREFIX)) return;
+  // Only when typing starts in an empty box (not after you removed the "~").
+  if (!wasEmpty.get(input)) return;
   if (!isMainSearchInput(input) && !isStatFilterInput(input)) return;
 
   // This runs before the trade site's own listener, so it sees the prefixed value.
@@ -41,5 +64,6 @@ const handleInput = (event: Event) => {
 };
 
 export default function setupFuzzySearch() {
+  document.addEventListener('beforeinput', handleBeforeInput, true);
   document.addEventListener('input', handleInput, true);
 }

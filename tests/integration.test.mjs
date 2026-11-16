@@ -68,6 +68,8 @@ const load = async ({path = '/trade/search/Standard/abc123', settings = [], rari
 
 const click = (element) => element.dispatchEvent(new element.ownerDocument.defaultView.MouseEvent('click', {bubbles: true}));
 const type = (input, value) => {
+  // Like a real keystroke: "beforeinput" sees the old value, then the value changes.
+  input.dispatchEvent(new input.ownerDocument.defaultView.Event('beforeinput', {bubbles: true}));
   input.value = value;
   input.dispatchEvent(new input.ownerDocument.defaultView.Event('input', {bubbles: true}));
 };
@@ -80,7 +82,7 @@ test('sidebar renders beside the page and starts on Bookmarks', async () => {
   assert.ok(document.getElementById('better-trading-container'));
   assert.ok(document.body.classList.contains('bt-body'));
   assert.ok(document.querySelector('.container-fluid').classList.contains('bt-page'));
-  assert.deepEqual([...document.querySelectorAll('.bt-root-page-menu-item')].map((t) => t.textContent.trim()), ['Bookmarks', 'Pinned items', 'History', 'Settings']);
+  assert.deepEqual([...document.querySelectorAll('.bt-root-page-menu-item')].map((t) => t.textContent.trim()), ['Bookmarks', 'Bulk', 'History', 'Settings']);
   assert.equal(document.querySelector('.bt-root-page-menu-item.is-active').textContent.trim(), 'Bookmarks');
   assert.match(document.title, /Staff - Trade - Path of Exile/);
 });
@@ -98,12 +100,15 @@ test('settings are off by default and turn features on', async () => {
   await sleep(50);
   const box = (label) => [...document.querySelectorAll('.bt-form-checkbox')].find((b) => b.textContent.trim() === label);
   const isChecked = (label) => box(label).querySelector('.bt-form-checkbox-indicator').classList.contains('is-active');
-  assert.deepEqual([...document.querySelectorAll('.bt-settings-section-title')].map((h) => h.textContent), ['Search form', 'Results', 'Panel']);
+  assert.deepEqual([...document.querySelectorAll('.bt-settings-section-title')].map((h) => h.textContent), ['Search form', 'Results', 'Panel', 'Tabs']);
   assert.deepEqual([...document.querySelectorAll('.bt-settings .bt-form-checkbox')].map((b) => b.textContent.trim()), [
     'Fuzzy search', 'Tier search', 'Stat filters are collapsible', 'Item rarity starts on Any Non-Unique',
+    'Keep the search bar on screen while scrolling',
     'Highlight searched mods', 'Plus / Minus buttons on result mods', 'Equivalent prices (from poe.ninja)',
-    'Warning for body armours that cannot be 6-socketed', 'Group identical listings from the same seller',
-    'Show panel when hovering the icon',
+    'Price summary above the results (lowest / median / highest)',
+    'Group identical listings from the same seller',
+    'Show panel when hovering the icon', 'Back up bookmarks automatically (Downloads/Better Trading 2)',
+    'Bookmarks', 'Pinned items', 'Bulk', 'History',
   ]);
   assert.equal(isChecked('Highlight searched mods'), true);
   assert.equal(isChecked('Item rarity starts on Any Non-Unique'), false);
@@ -121,8 +126,33 @@ test('settings are off by default and turn features on', async () => {
   assert.ok(box('Advanced filtering'));
   assert.equal(isChecked('Advanced filtering'), false);
 
+  type(search, '');
   type(search, 'bel');
   assert.equal(search.value, '~bel');
+  // The "~" is only added when typing starts in an empty box: delete it and it stays gone.
+  type(search, 'bel');
+  assert.equal(search.value, 'bel');
+  type(search, 'belt');
+  assert.equal(search.value, 'belt');
+  type(search, '');
+  type(search, 'b');
+  assert.equal(search.value, '~b', 'added again after emptying the box');
+  // Typing over all of the text (selected) also starts again with "~".
+  const Event = search.ownerDocument.defaultView.Event;
+  search.value = 'old text';
+  search.setSelectionRange(0, search.value.length);
+  search.dispatchEvent(new Event('beforeinput', {bubbles: true}));
+  search.value = 'r';
+  search.dispatchEvent(new Event('input', {bubbles: true}));
+  assert.equal(search.value, '~r', 'typing over selected text adds it');
+  // Part of the text selected: not added.
+  search.value = 'old text';
+  search.setSelectionRange(0, 3);
+  search.dispatchEvent(new Event('beforeinput', {bubbles: true}));
+  search.value = 'r text';
+  search.dispatchEvent(new Event('input', {bubbles: true}));
+  assert.equal(search.value, 'r text');
+  type(search, 'bel');
   assert.equal(document.querySelectorAll('.bt-tier-button').length, 1, 'only the explicit stat gets a tier button');
 
   // Without Advanced filtering: no filter box, and picking a tier only fills the min box.
@@ -320,7 +350,7 @@ test('the result filter only shows on the Bookmarks tab', async () => {
   const {document} = await load({settings: ['tier-search', 'advanced-filtering']});
   assert.ok(document.querySelector('.bt-mod-filter'));
 
-  for (const label of ['Pinned items', 'History', 'Settings']) {
+  for (const label of ['Bulk', 'History', 'Settings']) {
     click(tab(document, label));
     await sleep(50);
     assert.equal(document.querySelector('.bt-mod-filter'), null, `hidden on ${label}`);
@@ -421,7 +451,7 @@ test('tier search filter hides results that do not match', async () => {
 });
 
 test('results get a Pin button, and identical listings are grouped', async () => {
-  const {document} = await load();
+  const {document} = await load({settings: ['tab-pinned-items']});
   const rows = [...document.querySelectorAll('.resultset > .row[data-id]')];
 
   assert.ok(rows.every((r) => r.hasAttribute('bt-enhanced')));
@@ -433,7 +463,7 @@ test('results get a Pin button, and identical listings are grouped', async () =>
   click(rows[0].querySelector('.bt-pin-button'));
   await sleep(50);
   assert.ok(rows[0].classList.contains('bt-pinned'));
-  click(tab(document, 'Pinned items'));
+  click(tab(document, 'Pinned'));
   await sleep(50);
   assert.equal(document.querySelectorAll('.bt-pinned-item-wrapper').length, 1);
   assert.match(document.querySelector('.bt-pinned-item-wrapper').textContent, /Rage Bane/);
@@ -717,7 +747,7 @@ test('Add build turns a Path of Building code into a folder of trade searches', 
 
   const folder = store['bookmark-folders'].value[0];
   // The build has two item sets; its own choice ("Endgame") is used unless another is picked.
-  assert.equal(folder.title, 'Deadeye (level 95) \u2013 Endgame');
+  assert.equal(folder.title, 'Deadeye \u2013 Endgame');
   assert.equal(folder.icon, 'deadeye');
   const trades = store[`bookmark-trades--${folder.id}`].value;
   // Equipped items and tree jewels, in slot order; weapon swap and empty slots left out.
@@ -800,7 +830,7 @@ test('Add build lists the build\'s item sets and uses the one picked', async () 
   const fresh = await load({onFetch: tradeData, nodeStreams: true});
   await addBuild(fresh.document, fresh.window, POB_CODE, 'Leveling');
   const folder = fresh.store['bookmark-folders'].value[0];
-  assert.equal(folder.title, 'Deadeye (level 95) – Leveling');
+  assert.equal(folder.title, 'Deadeye – Leveling');
   const trades = fresh.store[`bookmark-trades--${folder.id}`].value;
   // Leveling set: just its helmet, plus the jewels in the passive tree.
   assert.deepEqual(trades.map((t) => t.title), ['Helmet: Starter Cap (Hubris Circlet)', 'Jewel: Dusk Delirium (Viridian Jewel)']);
@@ -860,7 +890,7 @@ test('Plus and Minus on result mods add the mod to an And group and a Not group'
   window.eval(readFileSync(new URL('../dist/chrome/page.js', import.meta.url), 'utf8'));
 
   const field = document.querySelector('.resultset > div.row [data-field="stat.explicit.stat_2974417149"]');
-  assert.ok(document.body.classList.contains('bt-mod-buttons-on'));
+  assert.ok(document.querySelector('.bt-mod-buttons'), 'buttons are built while the setting is on');
   const [plus, minus] = field.querySelectorAll('.bt-mod-button');
   assert.equal(plus.textContent, '+');
   assert.equal(minus.textContent, '−');
@@ -891,19 +921,26 @@ test('Plus and Minus on result mods add the mod to an And group and a Not group'
 
 test('Plus / Minus buttons can be turned off in Settings', async () => {
   const {document} = await load();
-  assert.ok(document.body.classList.contains('bt-mod-buttons-on'));
+  assert.ok(document.querySelector('.bt-mod-buttons'));
   click(tab(document, 'Settings'));
   await sleep(50);
   const option = [...document.querySelectorAll('.bt-settings .bt-form-checkbox')].find((c) => c.textContent.trim() === 'Plus / Minus buttons on result mods');
   assert.ok(option, 'option is in the Settings tab');
   click(option);
   await sleep(50);
-  assert.ok(!document.body.classList.contains('bt-mod-buttons-on'));
+  assert.equal(document.querySelector('.bt-mod-buttons'), null, 'turned off: the buttons are removed, not just hidden');
 });
 
 test('About has no settings; every result option in Settings turns on and off at once', async () => {
-  const ninja = {lines: [{currencyTypeName: 'Chaos Orb', chaosEquivalent: 1}, {currencyTypeName: 'Divine Orb', chaosEquivalent: 150}]};
-  const {window, document} = await load({onMessage: (message) => (message.query === 'poe-ninja' ? ninja : null)});
+  // poe.ninja's current currency overview format.
+  const ninja = {
+    core: {primary: 'chaos'},
+    lines: [{id: 'chaos', primaryValue: 1}, {id: 'divine', primaryValue: 150}],
+    items: [{id: 'chaos', name: 'Chaos Orb'}, {id: 'divine', name: 'Divine Orb'}],
+  };
+  const asked = [];
+  const {window, document} = await load({onMessage: (message) => (message.query === 'poe-ninja' ? (asked.push(message.resource), ninja) : null)});
+  assert.match(asked[0], /^\/poe1\/api\/economy\/exchange\/current\/overview\?league=Standard&type=Currency$/);
 
   // About: only things about the extension.
   const aboutButton = [...document.querySelectorAll('a.bt-header-button')].pop();
@@ -914,10 +951,12 @@ test('About has no settings; every result option in Settings turns on and off at
   click(aboutButton);
   await sleep(50);
 
-  // Make the first result a 3-socket body armour at item level 30 (can have 4 sockets: warning).
   const first = document.querySelector('.resultset > div.row[data-id]');
-  first.querySelector('.icon img').src = 'https://web.poecdn.com/image/Art/2DItems/Armours/BodyArmours/BodyStr1.png';
-  first.querySelector('[data-field="ilvl"] span:last-child').textContent = '30';
+  // Priced at 100 Chaos: shows as Divines (a Chaos price gets no Chaos equivalent).
+  // (its identical twin, the next result, too, so the two are still grouped).
+  [...document.querySelectorAll('.resultset > div.row[data-id]')].slice(0, 2).forEach((row) => {
+    row.querySelector('[data-field="price"] > br + span').textContent = '100';
+  });
 
   click(tab(document, 'Settings'));
   await sleep(50);
@@ -928,21 +967,20 @@ test('About has no settings; every result option in Settings turns on and off at
   };
   const count = (selector) => document.querySelectorAll(selector).length;
 
-  // Settled state after load (the socket change above shows once results are redone).
-  assert.ok(count('.bt-equivalent-pricings') > 0, 'equivalent prices shown');
+  // Settled state after load (the changes above show once results are redone).
+  assert.equal(count('.bt-equivalent-pricings'), 0, 'a 5 Chaos price has no equivalent');
   assert.ok(count('.item-mod.bt-highlight-stat-filters') > 0, 'searched mods highlighted');
   assert.equal(count('.bt-group-button'), 1, 'identical listings grouped');
 
   await toggle('Equivalent prices (from poe.ninja)');
   assert.equal(count('.bt-equivalent-pricings'), 0);
-  assert.equal(count('.bt-maximum-sockets'), 1, 'redoing the results also picked up the socket warning');
   await toggle('Equivalent prices (from poe.ninja)');
-  assert.ok(count('.bt-equivalent-pricings') > 0);
+  assert.equal(count('.bt-equivalent-pricings'), 2);
+  assert.match(document.querySelector('.bt-equivalent-pricings').textContent, /0\.7×/, '100 Chaos = 0.7 Divine');
+  await toggle('Equivalent prices (from poe.ninja)');
+  assert.equal(count('.bt-equivalent-pricings'), 0);
+  await toggle('Equivalent prices (from poe.ninja)');
 
-  await toggle('Warning for body armours that cannot be 6-socketed');
-  assert.equal(count('.bt-maximum-sockets'), 0);
-  await toggle('Warning for body armours that cannot be 6-socketed');
-  assert.equal(document.querySelector('.bt-maximum-sockets').textContent, 'Max. 4 sockets');
 
   await toggle('Highlight searched mods');
   assert.equal(count('.item-mod.bt-highlight-stat-filters'), 0);
@@ -955,8 +993,8 @@ test('About has no settings; every result option in Settings turns on and off at
   await toggle('Group identical listings from the same seller');
   assert.equal(count('.bt-group-button'), 1);
 
-  // Redoing never doubles the buttons on a result.
-  assert.equal(first.querySelectorAll('.bt-pin-button').length, 1);
+  // Redoing never doubles the buttons on a result (and adds no Pin button: Pinned is off).
+  assert.equal(first.querySelectorAll('.bt-pin-button').length, 0);
   assert.equal(first.querySelectorAll('.bt-mod-buttons').length, first.querySelectorAll('.item-mod [data-field^="stat."]').length);
   window.close();
 });
@@ -1008,11 +1046,273 @@ test('Add build: a loadout brings its own tree jewels; Relics search as uniques'
 
   await addBuild(document, window, LOADOUT_CODE, 'Endgame');
   const folder = store['bookmark-folders'].value[0];
-  assert.equal(folder.title, 'Elementalist (level 95) \u2013 Endgame');
+  assert.equal(folder.title, 'Elementalist \u2013 Endgame');
   const trades = store[`bookmark-trades--${folder.id}`].value;
   // Endgame's shield, and Endgame's jewel once (it sits in two sockets); not the "95" tree's jewel.
   assert.deepEqual(trades.map((t) => t.title), ['Weapon: Svalinn', 'Jewel: Cluster Name (Large Cluster Jewel)']);
   const shield = decodeSlug(trades[0].location.slug);
   assert.equal(shield.name, 'Svalinn');
   assert.equal(shield.type, 'Girded Tower Shield');
+});
+
+test('Bulk counts listings per seller; tabs can be turned off; Pinned is off by default', async () => {
+  const {window, document} = await load();
+  const tabs = () => [...document.querySelectorAll('.bt-root-page-menu-item')].map((t) => t.textContent.trim());
+  assert.deepEqual(tabs(), ['Bookmarks', 'Bulk', 'History', 'Settings']);
+  // Pinned is off, so results have no Pin button showing.
+  assert.equal(document.querySelector('.bt-pin-button'), null, 'no Pin buttons while the Pinned tab is off');
+  assert.ok(!document.body.classList.contains('bt-sticky-search'), 'the search bar is not pinned by default');
+
+  // Give the results three sellers: A twice, B and C once each (the page has 4+ rows).
+  const first = document.querySelector('.resultset > div.row[data-id]');
+  for (let i = document.querySelectorAll('.resultset > div.row[data-id]').length; i < 4; i++) {
+    const copy = first.cloneNode(true);
+    copy.setAttribute('data-id', `copy${i}`);
+    first.parentNode.append(copy);
+  }
+  const rows = [...document.querySelectorAll('.resultset > div.row[data-id]')];
+  const setSeller = (row, name) => row.querySelectorAll('.profile-link a').forEach((a) => {
+    a.textContent = name;
+    a.href = `/account/view-profile/${name}`;
+  });
+  rows.forEach((row, i) => setSeller(row, i < 2 ? 'SellerA#1' : i === 2 ? 'SellerB#2' : `Seller${i}#3`));
+
+  click(tab(document, 'Bulk'));
+  await sleep(50);
+  const counts = () => [...document.querySelectorAll('.bt-bulk-seller')].map((r) => `${r.querySelector('.bt-bulk-seller-name').textContent} ${r.querySelector('.bt-bulk-seller-count').textContent}`);
+  // Only sellers with more than one listing are listed.
+  assert.deepEqual(counts(), ['SellerA#1 2']);
+  assert.match(document.querySelector('.bt-bulk-summary').textContent, new RegExp(`${rows.length} listings from ${rows.length - 1} sellers, 1 with more than one`));
+
+  // Each seller is a card listing their prices, with Find and Buy.
+  const card = document.querySelector('.bt-bulk-seller');
+  const listings = () => [...card.querySelectorAll('.bt-bulk-listing')];
+  assert.equal(listings().length, 2);
+  assert.match(listings()[0].querySelector('.bt-bulk-listing-price').textContent, /Price:\s*5/);
+  assert.equal(listings()[0].querySelector('.bt-bulk-listing-currency').alt, 'Chaos Orb');
+
+  // Find: jumps to the listing and outlines it for a moment. The second listing is a
+  // copy of the first, tucked into its group: Find opens the group to show it.
+  assert.equal(rows[1].getAttribute('bt-regroup-state'), 'hidden');
+  click(listings()[1].querySelector('.is-find'));
+  await sleep(50);
+  assert.equal(rows[1].getAttribute('bt-regroup-state'), 'visible', 'the group was opened');
+  assert.ok(rows[1].classList.contains('bt-bulk-found'));
+
+  // Buy: greyed out while the site's own button is expired; otherwise presses it.
+  const buy = () => listings()[0].querySelector('.is-buy');
+  assert.equal(buy().disabled, true);
+  const siteButton = rows[0].querySelector('.direct-btn');
+  let pressed = 0;
+  siteButton.addEventListener('click', () => pressed++);
+  siteButton.disabled = false;
+  await sleep(300);
+  assert.equal(buy().disabled, false);
+  click(buy());
+  assert.equal(pressed, 1);
+
+  // The heading folds the card and unfolds it again.
+  click(card.querySelector('.bt-bulk-seller-header'));
+  await sleep(50);
+  assert.equal(listings().length, 0);
+  click(card.querySelector('.bt-bulk-seller-header'));
+  await sleep(50);
+  assert.equal(listings().length, 2);
+
+  // A new listing from SellerB is counted without leaving the tab.
+  const extra = rows[3].cloneNode(true);
+  extra.setAttribute('data-id', 'extra');
+  setSeller(extra, 'SellerB#2');
+  rows[3].parentNode.append(extra);
+  await sleep(300);
+  assert.deepEqual(counts(), ['SellerA#1 2', 'SellerB#2 2']);
+
+  // Settings > Tabs: turn Pinned on and History off.
+  click(tab(document, 'Settings'));
+  await sleep(50);
+  const box = (label) => [...document.querySelectorAll('.bt-settings .bt-form-checkbox')].find((b) => b.textContent.trim() === label);
+  click(box('Pinned items'));
+  click(box('History'));
+  await sleep(50);
+  assert.deepEqual(tabs(), ['Bookmarks', 'Pinned', 'Bulk', 'Settings']);
+  assert.ok(document.querySelector('.resultset .bt-pin-button'), 'turning Pinned on adds Pin buttons to the results');
+  window.close();
+});
+
+test('result filter: map regexes (poe.re style) filter by properties and mods', async () => {
+  const {document} = await load({settings: ['tier-search', 'advanced-filtering']});
+  const resultset = document.querySelector('.resultset');
+  const template = resultset.querySelector('div.row[data-id]');
+  resultset.querySelectorAll('div.row[data-id]').forEach((row) => row.remove());
+
+  // Map results laid out like the live trade site.
+  const makeMap = (id, props, mods) => {
+    const row = template.cloneNode(true);
+    row.setAttribute('data-id', id);
+    row.querySelector('.item-popup__header').innerHTML = `<div class="item-popup__header-line">Map ${id}</div><div class="item-popup__header-line">Strand Map (Tier 16)</div>`;
+    row.querySelector('.item-popup__content').innerHTML =
+      props.map((p) => `<div class="item-property item-popup__property">${p}</div>`).join('') +
+      mods.map((m) => `<div class="item-mod item-mod--explicit"><span class="s lc">${m}</span><span class="lc l">P0<span class="d">[1]</span></span></div>`).join('');
+    resultset.append(row);
+  };
+  makeMap('a', ['Item Quantity: +87%', 'Monster Pack Size: +32%'], ['Monsters reflect 18% of Elemental Damage', '21% increased number of Rare Monsters']);
+  makeMap('b', ['Item Quantity: +92%', 'Monster Pack Size: +25%'], ['15% more Monster Life']);
+  makeMap('c', ['Item Quantity: +45%', 'Monster Pack Size: +10%'], ['15% more Monster Life']);
+  await sleep(100);
+
+  const box = document.querySelector('.bt-mod-filter input');
+  const shown = async (query) => {
+    type(box, query);
+    await sleep(100);
+    return [...resultset.querySelectorAll('div.row[data-id]:not(.bt-mod-filter-hidden)')].map((r) => r.getAttribute('data-id'));
+  };
+
+  // Quantity of 80% or more.
+  assert.deepEqual(await shown('"y: \\+([89]\\d|\\d{3})%"'), ['a', 'b']);
+  // ...and no elemental reflect.
+  assert.deepEqual(await shown('"y: \\+([89]\\d|\\d{3})%" "!ele.*refl|refl.*ele"'), ['b']);
+  // "!" outside the quotes works too, and "|" means either.
+  assert.deepEqual(await shown('!"monster life"'), ['a']);
+  assert.deepEqual(await shown('"rare monsters|pack size: \\+25"'), ['a', 'b']);
+  // The matched mod is highlighted.
+  await shown('"rare monsters"');
+  assert.match(resultset.querySelector('div.row[data-id="a"] .bt-mod-filter-highlight').textContent, /Rare Monsters/);
+  // A pattern still being typed (invalid regex) is matched as plain text instead of breaking.
+  assert.deepEqual(await shown('"monster life ("'), []);
+  // The name lines count too ("Map a", "Strand Map").
+  assert.deepEqual(await shown('"map [ab]$"'), ['a', 'b']);
+  // Plain words still use the normal mod filter.
+  assert.deepEqual(await shown('monster life'), ['b', 'c']);
+});
+
+// Implicits and enchantments go into the search unticked (except a cluster jewel's).
+const EXTRAS_XML = `<PathOfBuilding>
+<Build className="Witch" ascendClassName="Necromancer" level="90"/>
+<Items activeItemSet="1">
+<Item id="1">Rarity: RARE
+Doom Crown
+Hubris Circlet
+Implicits: 2
+{enchant}+42% to Fire Resistance
++40 to maximum Energy Shield
++90 to maximum Life</Item>
+<Item id="2">Rarity: UNIQUE
+Kaom's Heart
+Glorious Plate
+Implicits: 1
++40 to maximum Energy Shield
++(500-600) to maximum Life</Item>
+<Item id="3">Rarity: RARE
+Cluster Name
+Large Cluster Jewel
+Implicits: 1
+{crafted}7% increased maximum Life
++90 to maximum Life</Item>
+<ItemSet id="1" title="Main"><Slot name="Helmet" itemId="1"/><Slot name="Body Armour" itemId="2"/></ItemSet>
+</Items>
+<Tree activeSpec="1"><Spec><Sockets><Socket nodeId="1" itemId="3"/></Sockets></Spec></Tree>
+</PathOfBuilding>`;
+
+test('Add build: implicits and enchantments are added unticked', async () => {
+  const {document, window, store} = await load({onFetch: tradeData, nodeStreams: true});
+  await addBuild(document, window, deflateSync(Buffer.from(EXTRAS_XML)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_'));
+  const folder = store['bookmark-folders'].value[0];
+  const trades = store[`bookmark-trades--${folder.id}`].value;
+  const filtersOf = (title) => decodeSlug(trades.find((t) => t.title.startsWith(title)).location.slug).stats[0].filters;
+
+  // Rare helmet: the mod is ticked; the implicit and the enchant are there but unticked.
+  const helmet = filtersOf('Helmet');
+  assert.deepEqual(helmet.map((f) => [f.id, Boolean(f.disabled)]), [
+    ['explicit.stat_life', false],
+    ['explicit.stat_fire', true],
+    ['explicit.stat_es_local', true], // armour: the local version of the stat
+  ]);
+
+  // Unique: its own mod ticked (no value), its implicit unticked.
+  const body = filtersOf('Body Armour');
+  assert.deepEqual(body.map((f) => [f.id, Boolean(f.disabled)]), [['explicit.stat_life', false], ['explicit.stat_es_local', true]]);
+
+  // Cluster jewel: its implicit/enchant stays ticked.
+  const jewel = filtersOf('Jewel');
+  assert.ok(jewel.every((f) => !f.disabled));
+  assert.equal(jewel.length, 2);
+});
+
+test('bookmarks are backed up to a file automatically after they change', async () => {
+  const saved = [];
+  const {document, window} = await load({onMessage: (message) => (message.query === 'backup-file' ? (saved.push(message.text), true) : null)});
+
+  click(button(document, 'New folder'));
+  await sleep(30);
+  type(document.querySelector('.bt-modal-container input'), 'Backed up');
+  click(document.querySelector('.bt-icon-options .bt-icon-option'));
+  await sleep(30);
+  document.querySelector('.bt-modal-container form').dispatchEvent(new window.Event('submit', {bubbles: true, cancelable: true}));
+  await sleep(300);
+  assert.equal(saved.length, 0, 'waits a few seconds, so quick changes make one file');
+  const status = () => document.querySelector('.bt-backup-status').textContent;
+  assert.equal(status(), 'Auto backup saves a few seconds after your bookmarks change.');
+
+  await sleep(5300);
+  assert.equal(saved.length, 1);
+  // The same format as the Backup button: each folder is "version:base64(JSON)".
+  const folder = JSON.parse(Buffer.from(saved[0].split('\n')[0].split(':')[1], 'base64').toString());
+  assert.equal(folder.tit, 'Backed up');
+  await sleep(50);
+  assert.equal(status(), 'Auto backup saved less than 5 seconds ago.');
+
+  // Nothing changed: no new file. Turned off: no file either.
+  // (Turned off in another tab: this tab hears about it.)
+  window.localStorage.setItem('bt-setting-auto-backup', 'off');
+  window.dispatchEvent(new window.StorageEvent('storage', {key: 'bt-setting-auto-backup'}));
+  click(button(document, 'New folder'));
+  await sleep(30);
+  type(document.querySelector('.bt-modal-container input'), 'Not backed up');
+  click(document.querySelector('.bt-icon-options .bt-icon-option'));
+  await sleep(30);
+  document.querySelector('.bt-modal-container form').dispatchEvent(new window.Event('submit', {bubbles: true, cancelable: true}));
+  await sleep(5500);
+  assert.equal(saved.length, 1);
+  window.dispatchEvent(new window.Event('focus'));
+  window.close();
+});
+
+test('price summary: lowest, median and highest of the loaded results, in Chaos / Divines', async () => {
+  const ninja = {lines: [{id: 'chaos', primaryValue: 1}, {id: 'divine', primaryValue: 150}], items: [{id: 'chaos', name: 'Chaos Orb'}, {id: 'divine', name: 'Divine Orb'}]};
+  const {window, document} = await load({settings: ['tier-search', 'advanced-filtering', 'price-summary'], onMessage: (message) => (message.query === 'poe-ninja' ? ninja : null)});
+  const resultset = document.querySelector('.resultset');
+  const template = resultset.querySelector('div.row[data-id]');
+  resultset.querySelectorAll('div.row[data-id]').forEach((row) => row.remove());
+
+  const addListing = (id, value, currency) => {
+    const row = template.cloneNode(true);
+    row.setAttribute('data-id', id);
+    row.querySelector('.profile-link a').textContent = `Seller${id}`;
+    row.querySelectorAll('.profile-link a').forEach((a) => (a.href = `/account/view-profile/Seller${id}`));
+    row.querySelector('[data-field="price"] > br + span').textContent = value;
+    row.querySelector('[data-field="price"] .currency-text span').textContent = currency;
+    resultset.append(row);
+  };
+  addListing('a', '5', 'Chaos Orb');
+  addListing('b', '40', 'Chaos Orb');
+  addListing('c', '2', 'Divine Orb'); // 300 Chaos
+  await sleep(300);
+
+  const summary = () => document.querySelector('.bt-price-summary')?.textContent;
+  assert.equal(summary(), '3 listings: lowest 5 c · median 40 c · highest 2 div');
+  assert.equal(document.querySelector('.bt-price-summary').nextElementSibling, resultset, 'right above the results');
+
+  // Listings the result filter hides are left out.
+  resultset.querySelector('div.row[data-id="c"] .item-mod--explicit [data-field^="stat."] > span:last-child').textContent = 'Only on listing c';
+  type(document.querySelector('.bt-mod-filter input'), '"!only on listing c"');
+  await sleep(200);
+  assert.ok(resultset.querySelector('div.row[data-id="c"]').classList.contains('bt-mod-filter-hidden'));
+  assert.equal(summary(), '2 listings: lowest 5 c · median 22.5 c · highest 40 c');
+
+  // Turned off in Settings.
+  click(tab(document, 'Settings'));
+  await sleep(50);
+  click([...document.querySelectorAll('.bt-settings .bt-form-checkbox')].find((b) => b.textContent.trim().startsWith('Price summary')));
+  await sleep(100);
+  assert.equal(document.querySelector('.bt-price-summary'), null);
 });

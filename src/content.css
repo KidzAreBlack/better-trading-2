@@ -298,9 +298,11 @@ body.bt-is-collapsed.bt-is-peeking .bt-header-expand-button.is-visible { opacity
 .bt-icon-option { border: 2px solid transparent; background-color: transparent; transition: 0.2s ease; transition-property: border-color, background-color; cursor: pointer; }
 .bt-icon-option.is-selected { border-color: var(--bt-gold-alt); background-color: rgba(90, 56, 6, 0.5); }
 .bt-icon-option-image { width: 100%; height: auto; }
-.bt-backup { display: flex; align-items: center; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.25); margin-top: 10px; }
+.bt-backup { display: flex; flex-wrap: wrap; align-items: center; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.25); margin-top: 10px; }
 .bt-backup-title { margin: 0 auto 0 0; font-family: var(--bt-font); font-size: 15px; color: var(--bt-white); }
 .bt-button.bt-backup-action { margin: 0 0 0 5px; }
+.bt-backup-status { flex: 1 0 100%; margin-top: 6px; font-size: 11px; color: rgba(255, 255, 255, 0.6); }
+.bt-backup-status.is-problem { color: #e07a6a; }
 
 /* History */
 .bt-history-entry-link { display: block; position: relative; z-index: 0; padding: 3px 5px; color: var(--bt-white); }
@@ -355,6 +357,7 @@ body.bt-is-collapsed.bt-is-peeking .bt-header-expand-button.is-visible { opacity
 .bt-mod-filter-help { padding: 8px; margin-top: 5px; background-color: rgba(22, 22, 22, 0.9); font-size: 12px; line-height: 1.6; color: var(--bt-beige); }
 .bt-mod-filter-help b { color: var(--bt-white); }
 .bt-mod-filter-help-note { margin-top: 6px; color: var(--bt-gray-alt); }
+.bt-mod-filter-help-title { margin-top: 8px; font-weight: bold; }
 .bt-mod-filter-scan { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; margin-top: 5px; }
 .bt-mod-filter-scan-trailing { display: flex; margin-left: auto; }
 .bt-mod-filter-scan-trailing .bt-button { height: 26px; white-space: nowrap; }
@@ -377,10 +380,12 @@ body.bt-is-collapsed.bt-is-peeking .bt-header-expand-button.is-visible { opacity
 .results.compact .resultset:not(.exchange) .price .currency-text::after { display: none !important; }
 .results.compact .resultset:not(.exchange) .price > span { margin-bottom: 5px; float: unset !important; }
 .results.compact .resultset:not(.exchange) .row .right { margin-top: 0 !important; }
+.bt-equivalent-pricings { display: flex !important; align-items: center; justify-content: center; }
+.bt-equivalent-pricings > span { display: inline-flex; align-items: center; }
 .bt-equivalent-pricings-equals { margin: 0 5px; }
 .results:not(.compact) .bt-equivalent-pricings { background-color: rgba(255, 255, 255, 0.1); }
 .results:not(.compact) .bt-equivalent-pricings.bt-equivalent-pricings-equivalent,
-.results:not(.compact) .bt-equivalent-pricings.bt-equivalent-pricings-chaos-fraction { padding-top: 0 !important; }
+.results:not(.compact) .bt-equivalent-pricings.bt-equivalent-pricings-chaos-fraction { padding: 2px 8px !important; }
 
 /* Mods you are looking for: stat filters of the search, and the tier search box. Colour set in Settings. */
 .bt-highlight-stat-filters, .bt-mod-filter-highlight { background-color: var(--bt-highlight-bg, rgba(51, 170, 68, 0.35)); }
@@ -388,7 +393,6 @@ body.bt-is-collapsed.bt-is-peeking .bt-header-expand-button.is-visible { opacity
    background, which cut the highlight bar into pieces. Let the row's highlight show through. */
 .bt-highlight-stat-filters .lc .d, .bt-mod-filter-highlight .lc .d { background-color: transparent !important; }
 
-.bt-maximum-sockets { min-height: 15px; padding: 1px 4px; border: 1px solid #333; background-color: #000; text-align: center; font-size: 85%; font-weight: bold; color: #aaa; }
 
 .bt-pin-button { min-width: 47px !important; }
 .bt-pin-button .bt-pin-button-pinned { display: none; }
@@ -487,10 +491,9 @@ div.row[bt-regroup-state='visible'] { background: rgba(16, 16, 16, 0.8) !importa
 }
 
 /* Plus / Minus on result mods: shown on hover, just left of the mod text, without moving it. */
-.bt-mod-buttons { display: none; position: relative; width: 0; height: 1em; vertical-align: middle; }
-.bt-mod-buttons-on .bt-mod-buttons { display: inline-block; }
+.bt-mod-buttons { display: inline-block; position: relative; width: 0; height: 1em; vertical-align: middle; }
 .bt-mod-buttons-inner { display: none; position: absolute; right: 5px; top: 50%; transform: translateY(-50%); gap: 3px; z-index: 2; }
-.bt-mod-buttons-on .item-mod:hover .bt-mod-buttons-inner { display: flex; }
+.item-mod:hover .bt-mod-buttons-inner { display: flex; }
 .bt-mod-button {
   width: 14px; height: 14px; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.5);
   color: #fff; font: bold 11px/12px Arial, sans-serif; text-align: center; cursor: pointer;
@@ -498,3 +501,33 @@ div.row[bt-regroup-state='visible'] { background: rgba(16, 16, 16, 0.8) !importa
 .bt-mod-button-and { background: #2f7a32; }
 .bt-mod-button-not { background: #8a2020; }
 .bt-mod-button:hover { border-color: #fff; filter: brightness(1.25); }
+
+
+/* Bulk: listings per seller. */
+.bt-bulk-summary { margin-bottom: 8px; font-size: 13px; color: rgba(255, 255, 255, 0.7); }
+.bt-bulk-seller { margin-bottom: 12px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; background: rgba(0, 0, 0, 0.45); overflow: hidden; }
+.bt-bulk-seller-header { display: flex; align-items: center; gap: 8px; padding: 8px 10px; cursor: pointer; user-select: none; }
+.bt-bulk-seller-header:hover { background: rgba(138, 86, 9, 0.15); }
+.bt-bulk-seller-arrow { flex: 0 0 auto; font-size: 10px; color: var(--bt-gold-alt); }
+.bt-bulk-seller-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--bt-font); font-size: 15px; color: #c8b07a; }
+.bt-bulk-seller-count { flex: 0 0 auto; font-size: 13px; color: var(--bt-white); }
+.bt-bulk-listing { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+.bt-bulk-listing-price { display: flex; flex: 1 1 auto; align-items: center; gap: 4px; min-width: 0; font-family: var(--bt-font); font-size: 14px; font-weight: bold; color: var(--bt-beige); }
+.bt-bulk-listing-value { color: #e4c34a; }
+.bt-bulk-listing-currency { width: 20px; height: 20px; object-fit: contain; }
+.bt-bulk-button { flex: 0 0 auto; width: 54px; height: 24px; padding: 0; border: 1px solid; border-radius: 2px; font-family: var(--bt-font); font-size: 12px; text-transform: uppercase; cursor: pointer; }
+.bt-bulk-button.is-find { border-color: #24364d; background: #0b1724; color: #a9bdd4; }
+.bt-bulk-button.is-find:hover { background: #12253a; color: var(--bt-white); }
+.bt-bulk-button.is-buy { border-color: #5a4318; background: #1c1508; color: #c9b07a; }
+.bt-bulk-button.is-buy:hover { background: #2c210c; color: var(--bt-white); }
+.bt-bulk-button:disabled { opacity: 0.4; cursor: default; }
+.bt-bulk .bt-alert-message { margin-top: 10px; }
+.resultset > div.row.bt-bulk-found { outline: 2px solid #c8962e; outline-offset: -2px; }
+
+/* Price summary above the results. */
+.bt-price-summary { margin: 4px 0 6px; padding: 6px 10px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 3px; background: rgba(0, 0, 0, 0.45); font-family: var(--bt-font); font-size: 14px; text-align: center; color: var(--bt-beige); }
+
+/* Search form pinned to the top while scrolling. With the filters open it can be taller
+   than the window, so it then gets its own scroll (up to 70% of the window). */
+body.bt-sticky-search #trade > .top { position: sticky; top: 0; z-index: 50; width: 100%; box-sizing: border-box; background: #080808; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6); }
+body.bt-sticky-search #trade > .top:not(:has(.search-advanced-hidden)) { max-height: 70vh; overflow-y: auto; overscroll-behavior: contain; }

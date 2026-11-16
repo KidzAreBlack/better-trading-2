@@ -76,7 +76,7 @@ export function PinnedItems() {
             </div>
           ))}
 
-          <Button theme="gold" label="Clear pinned itmes" icon="times" onClick={() => clearPinnedItems()} />
+          <Button theme="gold" label="Clear pinned items" icon="times" onClick={() => clearPinnedItems()} />
         </>
       ) : (
         <AlertMessage type="warning" message={'Items can be pinned here by clicking the "pin" button near the "whisper" button.'} />

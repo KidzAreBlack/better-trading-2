@@ -1,15 +1,16 @@
 import {useEffect, useRef, useState} from 'preact/hooks';
 import * as bookmarks from '../lib/bookmarks';
+import {getAutoBackupStatus} from '../features/auto-backup';
 import type {BookmarkFolder, BookmarkTrade} from '../lib/bookmarks';
 import {assetUrl} from '../lib/ext';
 import {createBuildFolder, listItemSets, loadBuild} from '../lib/pob-import';
 import type {ItemSetChoice} from '../lib/pob-import';
 import {withoutTradeMode} from '../lib/search-link';
-import {isAdvancedFilteringOn} from '../lib/settings';
+import {isAdvancedFilteringOn, isEnabled} from '../lib/settings';
 import {recommendTitle} from '../lib/search-panel';
 import {currentLocation, tradeUrl} from '../lib/trade-location';
 import type {TradeSiteVersion} from '../lib/trade-location';
-import {copyToClipboard} from '../lib/util';
+import {copyToClipboard, timeAgo} from '../lib/util';
 import {AlertMessage, BookmarkFolderIcon, Button, ClipboardTextarea, ContextualMenu, Field, flash, Form, Input, Modal, useLoaded, useTradeModeSlugs} from './common';
 import {FaIcon} from './icons';
 import {ModFilter} from './ModFilter';
@@ -607,6 +608,33 @@ function Backup() {
       <Button class="bt-backup-action" theme="blue" icon="file-export" label="Save file" onClick={() => void generate()} />
       <Button class="bt-backup-action" theme="blue" icon="file-import" label="Restore from file" onFile={(file) => void restore(file)} />
       <a ref={linkRef} style="display:none" />
+      <AutoBackupStatusLine />
     </div>
   );
+}
+
+// "Auto backup saved 2 minutes ago", under the backup tools.
+function AutoBackupStatusLine() {
+  const status = useLoaded(['auto-backup-change', 'settings-change'], getAutoBackupStatus, getAutoBackupStatus());
+  const [, setTick] = useState(0);
+  // Keeps "x minutes ago" current.
+  useEffect(() => {
+    const timer = window.setInterval(() => setTick((tick) => tick + 1), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  let text: string;
+  let isProblem = false;
+  if (!isEnabled('auto-backup')) {
+    text = 'Auto backup is off (turn it on in Settings).';
+  } else if (status.failedAt) {
+    text = `Auto backup couldn't save the file (${timeAgo(status.failedAt)}).`;
+    isProblem = true;
+  } else if (status.savedAt) {
+    text = `Auto backup saved ${timeAgo(status.savedAt)}.`;
+  } else {
+    text = 'Auto backup saves a few seconds after your bookmarks change.';
+  }
+
+  return <div class={`bt-backup-status ${isProblem ? 'is-problem' : ''}`}>{text}</div>;
 }

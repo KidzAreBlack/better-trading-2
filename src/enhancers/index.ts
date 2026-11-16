@@ -1,5 +1,5 @@
 // Improvements added to each search result on the trade page: equivalent
-// prices, highlighted stats, socket warning, grouping of identical listings
+// prices, highlighted stats, grouping of identical listings
 // the Pin button and the Plus / Minus buttons on each mod.
 
 import {fetchChaosRatios, type ChaosRatios} from '../lib/poe-ninja';
@@ -52,7 +52,8 @@ const addEquivalentPricing = (row: Element, {price}: ParsedItem, ratios: ChaosRa
   const chaosValue = ratios[price.currencySlug];
   const divineValue = ratios['divine-orb'];
 
-  if (chaosValue) {
+  // A Chaos price needs no Chaos equivalent (poe.ninja lists Chaos itself at 1).
+  if (chaosValue && price.currencySlug !== 'chaos-orb') {
     const total = Math.round(price.value * chaosValue);
     if (!total) return;
 
@@ -85,28 +86,6 @@ const highlightStats = (row: Element, needles: RegExp[]) => {
     const text = (mod.querySelector('[data-field^="stat."]') || mod).textContent || '';
     if (needles.some((needle) => needle.test(text))) mod.classList.add('bt-highlight-stat-filters');
   });
-};
-
-// ---- Socket warning (PoE 1 body armours) --------------------------------------
-
-const SOCKET_THRESHOLDS = [
-  {maxSockets: 2, ilvl: 1},
-  {maxSockets: 3, ilvl: 24},
-  {maxSockets: 4, ilvl: 34},
-  {maxSockets: 5, ilvl: 49},
-];
-
-const addSocketWarning = (row: Element, {socketsCount, isBodyArmour, ilvl}: ParsedItem) => {
-  const frame = row.querySelector('.item-popup');
-  if (!frame || !ilvl || socketsCount === 0 || !isBodyArmour) return;
-
-  const threshold = SOCKET_THRESHOLDS.find((candidate) => ilvl <= candidate.ilvl);
-  if (!threshold || threshold.maxSockets <= socketsCount) return;
-
-  const warning = document.createElement('div');
-  warning.className = 'bt-maximum-sockets';
-  warning.textContent = `Max. ${threshold.maxSockets} sockets`;
-  frame.prepend(warning);
 };
 
 // ---- Group identical listings from the same seller ----------------------------
@@ -284,10 +263,9 @@ const enhanceNewRows = async () => {
       const item = parseItem(row);
       if (ratios) addEquivalentPricing(row, item, ratios);
       highlightStats(row, needles);
-      if (isEnabled('maximum-sockets') && location.version === '1') addSocketWarning(row, item);
       if (isEnabled('regroup-similars')) regroupSimilar(row);
-      addPinButton(row);
-      addModButtons(row);
+      if (isEnabled('tab-pinned-items')) addPinButton(row);
+      if (isEnabled('mod-buttons')) addModButtons(row);
     });
   } finally {
     isRunning = false;
@@ -301,11 +279,11 @@ const enhanceNewRows = async () => {
 
 // The result extras that a setting turns on or off. When one of them changes, results
 // already on the page are redone, so the change shows at once.
-const RESULT_SETTINGS = ['highlight-stat-filters', 'equivalent-pricings', 'maximum-sockets', 'regroup-similars'] as const;
+const RESULT_SETTINGS = ['highlight-stat-filters', 'equivalent-pricings', 'regroup-similars'] as const;
 const resultSettingsState = () => RESULT_SETTINGS.map((key) => isEnabled(key)).join();
 
 const redoAllRows = () => {
-  document.querySelectorAll('.bt-equivalent-pricings, .bt-maximum-sockets, .bt-group-button').forEach((element) => element.remove());
+  document.querySelectorAll('.bt-equivalent-pricings, .bt-group-button').forEach((element) => element.remove());
   document.querySelectorAll('.bt-highlight-stat-filters').forEach((element) => element.classList.remove('bt-highlight-stat-filters'));
   document.querySelectorAll('.resultset > div.row[bt-enhanced]').forEach((row) => {
     row.removeAttribute('bt-enhanced');
@@ -317,6 +295,16 @@ const redoAllRows = () => {
 
 export const setupEnhancers = (): void => {
   setupModButtons();
+
+  // Pin buttons only exist while the Pinned tab is on.
+  let wasPinning = isEnabled('tab-pinned-items');
+  on('settings-change', () => {
+    const isPinning = isEnabled('tab-pinned-items');
+    if (isPinning === wasPinning) return;
+    wasPinning = isPinning;
+    if (isPinning) document.querySelectorAll<HTMLElement>('.resultset > div.row[bt-enhanced]').forEach(addPinButton);
+    else document.querySelectorAll('.bt-pin-button').forEach((button) => button.remove());
+  });
 
   let lastState = resultSettingsState();
   on('settings-change', () => {
