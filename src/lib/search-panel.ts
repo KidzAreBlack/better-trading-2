@@ -18,7 +18,7 @@ const getRarity = (): string | null => inputValue(RARITY_INPUT, 'Any');
 export const getName = (): string | null => inputValue(SEARCH_INPUT);
 
 export const recommendTitle = (): string => {
-  const name = getName();
+  const name = getName()?.trim();
   if (name) return name;
 
   const category = getCategory();

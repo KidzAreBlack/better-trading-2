@@ -4,7 +4,7 @@ import {addCustomSound, getCustomSounds, getSoundChoice, getVolume, listSounds, 
 import {local} from '../lib/ext';
 import {getHighlightColor, setHighlightColor} from '../lib/highlight-color';
 import {clearHistory, fetchHistory} from '../lib/history';
-import {isEnabled, setEnabled, SETTINGS, SETTINGS_SECTIONS, settingHint} from '../lib/settings';
+import {isEnabled, setEnabled, SETTINGS, SETTINGS_SECTIONS} from '../lib/settings';
 import {tradeUrl} from '../lib/trade-location';
 import {sleep, timeAgo} from '../lib/util';
 import {FaIcon} from './icons';
@@ -122,7 +122,7 @@ export function Settings() {
             <div class="bt-settings-section-body">
               {section.keys.map((key) => (
             <div key={key} class="bt-settings-row">
-              <Checkbox label={SETTINGS[key].label} title={settingHint(key)} value={isEnabled(key)} onChange={(value) => setEnabled(key, value)} />
+              <Checkbox label={SETTINGS[key].label} value={isEnabled(key)} onChange={(value) => setEnabled(key, value)} />
               {key === 'tier-search' && isEnabled('tier-search') && (
                 <div class="bt-settings-sub-option">
                   <Checkbox label={SETTINGS['advanced-filtering'].label} value={isEnabled('advanced-filtering')} onChange={(value) => setEnabled('advanced-filtering', value)} />
@@ -212,9 +212,8 @@ function LiveAlertSoundOptions() {
         </div>
       )}
       <div class="bt-live-alert-line">
-        <Button theme="blue" label="Add a sound\u2026" icon="file-import" accept="audio/*" onFile={(file) => void addFile(file)} />
+        <Button theme="blue" label="Load custom sound" icon="file-import" accept="audio/*" onFile={(file) => void addFile(file)} />
       </div>
-      <div class="bt-live-alert-hint">Pick a different sound for a search in its bookmark's Edit window.</div>
     </div>
   );
 }

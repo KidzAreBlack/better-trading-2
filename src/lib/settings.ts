@@ -1,9 +1,9 @@
 import {local} from './ext';
 import {emit} from './util';
 
-// Options shown in the Settings tab. `defaultOn` decides the first-time state; `hint` shows on hover.
+// Options shown in the Settings tab. `defaultOn` decides the first-time state.
 export const SETTINGS = {
-  'fuzzy-search': {label: 'Fuzzy search', defaultOn: false},
+  'fuzzy-search': {label: 'Add fuzzy key to search', defaultOn: false},
   'tier-search': {label: 'Tier search', defaultOn: false},
   // Sub-option of Tier search: the result filter box, Load all / Next 100, and the link from the tier picker.
   'advanced-filtering': {label: 'Advanced filtering', defaultOn: false},
@@ -18,8 +18,8 @@ export const SETTINGS = {
   'regroup-similars': {label: 'Group identical listings from the same seller', defaultOn: true},
   'price-summary': {label: 'Price summary above the results (lowest / median / highest)', defaultOn: false},
   'mod-buttons': {label: 'Plus / Minus buttons on result mods', defaultOn: true},
-  'live-alert-sound': {label: 'Play a sound when a live search finds new items', defaultOn: true},
-  'live-alert-notification': {label: 'Live search desktop notification', hint: 'While the tab is in the background', defaultOn: false},
+  'live-alert-sound': {label: 'Live search custom sound', defaultOn: true},
+  'live-alert-notification': {label: 'Live search desktop notification', defaultOn: false},
   // Which tabs the panel shows (Settings always shows).
   'tab-bookmarks': {label: 'Bookmarks', defaultOn: true},
   'tab-pinned-items': {label: 'Pinned items', defaultOn: false},
@@ -37,8 +37,6 @@ export const SETTINGS_SECTIONS = [
 ] as const;
 
 export type SettingKey = keyof typeof SETTINGS;
-
-export const settingHint = (key: SettingKey): string | undefined => (SETTINGS[key] as {hint?: string}).hint;
 
 
 // Advanced filtering only works while Tier search is on.

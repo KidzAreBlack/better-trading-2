@@ -111,29 +111,29 @@ test('settings are off by default and turn features on', async () => {
   await sleep(50);
   assert.equal(window.localStorage.getItem('bt-settings-folded'), null);
   assert.deepEqual([...document.querySelectorAll('.bt-settings .bt-form-checkbox')].map((b) => b.textContent.trim()), [
-    'Fuzzy search', 'Tier search', 'Stat filters are collapsible', 'Item rarity starts on Any Non-Unique',
+    'Add fuzzy key to search', 'Tier search', 'Stat filters are collapsible', 'Item rarity starts on Any Non-Unique',
     'Keep the search bar on screen while scrolling',
     'Highlight searched mods', 'Plus / Minus buttons on result mods', 'Equivalent prices (from poe.ninja)',
     'Price summary above the results (lowest / median / highest)',
     'Group identical listings from the same seller',
-    'Play a sound when a live search finds new items',
+    'Live search custom sound',
     'Live search desktop notification',
     'Show panel when hovering the icon', 'Show the lowest price and listing count on bookmarks', 'Back up bookmarks automatically (Downloads/Better Trading 2)',
     'Bookmarks', 'Pinned items', 'Bulk', 'History',
   ]);
   assert.equal(isChecked('Highlight searched mods'), true);
   assert.equal(isChecked('Item rarity starts on Any Non-Unique'), false);
-  assert.equal(isChecked('Fuzzy search'), false);
+  assert.equal(isChecked('Add fuzzy key to search'), false);
   assert.equal(isChecked('Tier search'), false);
 
   // Advanced filtering only shows once Tier search is ticked.
   assert.equal(box('Advanced filtering'), undefined);
 
-  click(box('Fuzzy search'));
+  click(box('Add fuzzy key to search'));
   await sleep(50);
   click(box('Tier search'));
   await sleep(100);
-  assert.equal(isChecked('Fuzzy search'), true);
+  assert.equal(isChecked('Add fuzzy key to search'), true);
   assert.ok(box('Advanced filtering'));
   assert.equal(isChecked('Advanced filtering'), false);
 
@@ -1547,9 +1547,10 @@ test('Live search: new items above the shown ones play the sound once per batch,
   const box = (label) => [...document.querySelectorAll('.bt-settings .bt-form-checkbox')].find((b) => b.textContent.trim().startsWith(label));
   // The sound options show under the sound setting.
   assert.ok(document.querySelector('.bt-live-alert-sound'));
-  assert.match(document.querySelector('.bt-live-alert-hint').textContent, /bookmark's Edit window/);
-  click(box('Play a sound'));
-  assert.equal(box('Live search desktop notification').title, 'While the tab is in the background');
+  assert.equal(document.querySelector('.bt-live-alert-hint'), null);
+  assert.ok([...document.querySelectorAll('.bt-live-alert-options button, .bt-live-alert-options label')].some((b) => b.textContent.trim() === 'Load custom sound'));
+  click(box('Live search custom sound'));
+  assert.equal(box('Live search desktop notification').title, '', 'no hover text');
   click(box('Live search desktop notification'));
   await sleep(50);
   addRow('new3', 'top');
@@ -1676,4 +1677,53 @@ test('Price on bookmarks: the site rewriting the link in another order still fin
   await sleep(2000);
   assert.equal(store['bookmark-stats'].value.t1.current.count, 0);
   assert.equal(store['bookmark-stats'].value.t1.current.lowest, null);
+});
+
+test('Price on bookmarks: turning the setting off hides the lines and stops recording', async () => {
+  const visit = {lowest: '9 c', lowestChaos: 9, count: 40, isCountExact: true, at: new Date().toISOString()};
+  const {document, store, window} = await load({
+    path: '/trade/search/Standard/abc123',
+    stored: {
+      'bookmark-folders': {value: [{id: 'f1', title: 'Gear', version: '1', icon: null, archivedAt: null}], expiresAt: null},
+      'bookmark-trades--f1': {value: [{id: 't1', title: 'Belt', completedAt: null, location: {version: '1', type: 'search', slug: 'abc123'}}], expiresAt: null},
+      'bookmark-stats': {value: {t1: {current: visit, previous: null}}, expiresAt: null},
+    },
+  });
+  if (!document.querySelector('.bt-folder-trade')) click(document.querySelector('.bt-folder-header-label'));
+  await sleep(100);
+  assert.ok(document.querySelector('.bt-folder-trade-stats'));
+
+  click(tab(document, 'Settings'));
+  await sleep(50);
+  click([...document.querySelectorAll('.bt-settings .bt-form-checkbox')].find((b) => b.textContent.trim().startsWith('Show the lowest price')));
+  await sleep(50);
+  click(tab(document, 'Bookmarks'));
+  await sleep(150);
+  assert.ok(document.querySelector('.bt-folder-trade'));
+  assert.equal(document.querySelector('.bt-folder-trade-stats'), null, 'hidden while off');
+  await sleep(1800);
+  assert.deepEqual(store['bookmark-stats'].value.t1.current, visit, 'nothing new recorded while off');
+  assert.equal(window.localStorage.getItem('bt-setting-bookmark-prices'), 'off');
+});
+
+test('tab title: a search name with spaces at the end does not freeze the page', async () => {
+  const {document, window} = await load({path: '/trade/search/Standard/abc123'});
+  await sleep(100);
+  const input = document.querySelector('.search-panel .search-bar .search-left input');
+  input.value = '~Behemoth  ';
+  // jsdom, like browsers, reads the title back trimmed with spaces squeezed.
+  let writes = 0;
+  const descriptor = Object.getOwnPropertyDescriptor(window.Document.prototype, 'title');
+  Object.defineProperty(document, 'title', {
+    configurable: true,
+    get: () => descriptor.get.call(document).replace(/\s+/g, ' ').trim(),
+    set: (value) => {
+      writes++;
+      descriptor.set.call(document, value);
+    },
+  });
+  window.history.pushState({}, '', '/trade/search/Standard/def456');
+  await sleep(1500);
+  assert.ok(writes < 5, `the title was written ${writes} times`);
+  assert.match(document.title, /^~Behemoth - /);
 });

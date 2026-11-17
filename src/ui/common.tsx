@@ -210,9 +210,9 @@ export function Input(props: {label: string; value?: string; autofocus?: boolean
   );
 }
 
-export function Checkbox(props: {label: string; value: boolean; class?: string; title?: string; onChange: (value: boolean) => void}) {
+export function Checkbox(props: {label: string; value: boolean; class?: string; onChange: (value: boolean) => void}) {
   return (
-    <label class={`bt-form-checkbox ${props.class || ''}`} title={props.title} onClick={() => props.onChange(!props.value)}>
+    <label class={`bt-form-checkbox ${props.class || ''}`} onClick={() => props.onChange(!props.value)}>
       <div class={`bt-form-checkbox-indicator ${props.value ? 'is-active' : ''}`} />
       <span class="bt-form-checkbox-label">{props.label}</span>
     </label>

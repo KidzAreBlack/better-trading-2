@@ -90,15 +90,18 @@ export const fetchTrades = async (folderId: string): Promise<BookmarkTrade[]> =>
   return trades.map((trade) => ({...trade, location: {...trade.location, version: trade.location.version || '1'}}));
 };
 
+// Names are saved without spaces at the start or end ("Behemoth " → "Behemoth").
+const tidyTitle = (title: string) => title.replace(/\s+/g, ' ').trim();
+
 export const saveFolders = async (folders: BookmarkFolder[]): Promise<void> => {
-  await storage.set(FOLDERS_KEY, folders);
+  await storage.set(FOLDERS_KEY, folders.map((folder) => ({...folder, title: tidyTitle(folder.title)})));
   emit('bookmarks-change');
 };
 
 export const saveTrades = async (trades: BookmarkTrade[], folderId: string): Promise<void> => {
   await storage.set(
     `${TRADES_KEY}--${folderId}`,
-    trades.map((trade) => ({...trade, id: trade.id || uniqueId()}))
+    trades.map((trade) => ({...trade, title: tidyTitle(trade.title), id: trade.id || uniqueId()}))
   );
   emit('bookmarks-change');
 };

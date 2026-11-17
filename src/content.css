@@ -192,6 +192,8 @@ body.bt-is-collapsed.bt-is-peeking .bt-header-expand-button.is-visible { opacity
 /* Forms */
 .bt-form-container { display: grid; grid-gap: 15px; }
 .bt-form-container.is-disabled button[type='submit'] { opacity: 0.6; pointer-events: none; }
+/* The form's main button sits at the right at its own size, instead of stretching across the window. */
+.bt-form-container > button[type='submit'] { justify-self: end; min-width: 120px; }
 .bt-form-field { width: 100%; margin: 0; }
 .bt-form-field-label { margin-bottom: 5px; font-family: var(--bt-font); font-size: 15px; letter-spacing: 0.5px; color: var(--bt-beige); }
 .bt-form-field-helper { margin: 5px 0 0; font-size: 12px; font-weight: normal; color: rgba(255, 248, 225, 0.8); }
@@ -354,7 +356,6 @@ body.bt-is-collapsed.bt-is-peeking .bt-header-expand-button.is-visible { opacity
 .bt-live-alert-customs { display: grid; grid-gap: 6px; }
 .bt-live-alert-customs-title { font-size: 13px; color: rgba(255, 255, 255, 0.7); }
 .bt-live-alert-custom-name { flex: 1 1 auto; width: auto; min-width: 0; }
-.bt-live-alert-hint { font-size: 12px; color: rgba(255, 255, 255, 0.5); }
 .bt-trade-sound { flex: 1 1 auto; width: auto; min-width: 0; }
 .bt-live-alert-badge { display: block; margin: 0 0 6px; padding: 4px 10px; border: 1px solid #5a4318; border-radius: 3px; background: #1c1508; font-size: 13px; color: #c9b07a; cursor: pointer; }
 .bt-live-alert-badge:hover { color: #fff; }

@@ -512,7 +512,8 @@ function TradeEdition(props: {trade: BookmarkTrade; onSubmit: (trade: BookmarkTr
   return (
     <Form canSubmit={Boolean(title)} onSubmit={submit}>
       <Input label="Title" value={title} autofocus onChange={setTitle} />
-      {isEnabled('live-alert-sound') && (
+      {/* Saving a new bookmark only asks for its name; the sound can be picked later with Edit. */}
+      {props.trade.id && isEnabled('live-alert-sound') && (
         <Field label="Live search alert sound">
           <div class="bt-live-alert-line">
             <select class="bt-form-input bt-trade-sound" value={sound} onChange={(event) => setSound((event.target as HTMLSelectElement).value)}>

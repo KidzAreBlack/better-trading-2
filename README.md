@@ -48,7 +48,7 @@ single codebase. It keeps the original's look and adds a few search tools on top
   (on hover): **+** adds the mod to an **And** stat group in your search, **−** to a **Not** group (each group is
   made the first time, then reused). Click Search when ready. Turned on or off in Settings ("Plus / Minus buttons on result mods").
 - **Settings tab** (each one can be turned on or off):
-  - **Fuzzy search**: adds `~` when you start typing in an empty main search box or stat filter box (or type over
+  - **Add fuzzy key to search**: adds `~` when you start typing in an empty main search box or stat filter box (or type over
     all of its text). Delete it and it stays deleted.
   - **Tier search**: a **T** button on each stat filter that lists the mod's tiers for the selected Item
     Category and fills in the min value (PoE 1). With Item Category set to Any, it uses the item named in the

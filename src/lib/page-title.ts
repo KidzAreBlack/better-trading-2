@@ -12,17 +12,22 @@ let baseTitle = '';
 let title: string | null = null;
 let counter: number | null = null;
 
+// The browser trims the tab title and squeezes runs of spaces when it's read back, so the
+// title is written that way too. Otherwise "Behemoth " (trailing space) gives a title that
+// never reads back the same, and setting it over and over froze the page.
+const tidy = (text: string) => text.replace(/\s+/g, ' ').trim();
+
 const apply = () => {
   if (title === null) return;
 
-  const next = (counter !== null ? `(${counter}) ` : '') + title;
+  const next = tidy((counter !== null ? `(${counter}) ` : '') + title);
   if (document.title !== next) document.title = next;
 };
 
 const recalculate = async () => {
   const location = currentLocation();
   const bookmark = await findTradeByLocation(location);
-  const tradeTitle = bookmark ? bookmark.title : location.type === 'search' ? recommendTitle() : '';
+  const tradeTitle = tidy(bookmark ? bookmark.title : location.type === 'search' ? recommendTitle() : '');
 
   title = `${location.isLive ? '⚡ ' : ''}${tradeTitle ? `${tradeTitle} - ` : ''}${baseTitle}`;
   apply();
