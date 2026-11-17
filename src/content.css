@@ -337,11 +337,13 @@ body.bt-is-collapsed.bt-is-peeking .bt-header-expand-button.is-visible { opacity
 .bt-pinned-item-wrapper .price br, .bt-pinned-item-wrapper .price .currency-text span, .bt-pinned-item-wrapper .price .price-label { display: none; }
 
 /* Settings and About */
-.bt-settings { display: grid; grid-gap: 14px; padding: 5px 0; }
-.bt-settings-section { display: grid; grid-gap: 10px; }
-.bt-settings-section-title { display: flex; align-items: center; gap: 6px; margin: 0; font-family: var(--bt-font); font-size: 15px; letter-spacing: 0.5px; color: var(--bt-beige); cursor: pointer; user-select: none; }
-.bt-settings-section-title:hover { color: var(--bt-white); }
-.bt-settings-section-arrow { width: 10px; font-size: 10px; color: var(--bt-gold-alt); }
+.bt-settings { display: grid; grid-gap: 6px; padding: 5px 0; }
+.bt-settings-section { border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; background: rgba(0, 0, 0, 0.45); overflow: hidden; }
+.bt-settings-section-body { display: grid; grid-gap: 10px; padding: 10px 12px 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+.bt-settings-section-title { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 10px; font-family: var(--bt-font); font-size: 15px; letter-spacing: 0.5px; color: var(--bt-beige); cursor: pointer; user-select: none; }
+.bt-settings-section-title:hover { background: rgba(138, 86, 9, 0.15); color: var(--bt-white); }
+.bt-settings-section-arrow { flex: 0 0 auto; font-size: 14px; color: var(--bt-gold-alt); transition: transform 0.2s ease; }
+.bt-settings-section.is-folded .bt-settings-section-arrow { transform: rotate(-90deg); }
 .bt-settings-row { display: flex; flex-wrap: wrap; align-items: center; }
 .bt-settings-sub-option { flex: 0 0 100%; padding-left: 20px; margin-top: 10px; }
 .bt-live-alert-options { display: grid; grid-gap: 8px; }
@@ -527,7 +529,8 @@ div.row[bt-regroup-state='visible'] { background: rgba(16, 16, 16, 0.8) !importa
 .bt-bulk-seller { margin-bottom: 12px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; background: rgba(0, 0, 0, 0.45); overflow: hidden; }
 .bt-bulk-seller-header { display: flex; align-items: center; gap: 8px; padding: 8px 10px; cursor: pointer; user-select: none; }
 .bt-bulk-seller-header:hover { background: rgba(138, 86, 9, 0.15); }
-.bt-bulk-seller-arrow { flex: 0 0 auto; font-size: 10px; color: var(--bt-gold-alt); }
+.bt-bulk-seller-arrow { flex: 0 0 auto; font-size: 14px; color: var(--bt-gold-alt); transition: transform 0.2s ease; }
+.bt-bulk-seller.is-folded .bt-bulk-seller-arrow { transform: rotate(-90deg); }
 .bt-bulk-seller-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--bt-font); font-size: 15px; color: #c8b07a; }
 .bt-bulk-seller-count { flex: 0 0 auto; font-size: 13px; color: var(--bt-white); }
 .bt-bulk-sort { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; color: rgba(255, 255, 255, 0.7); }

@@ -3,7 +3,7 @@
 // lowest price changed since the visit before).
 
 import {parseItem} from '../enhancers/item';
-import {findTradeByLocation} from '../lib/bookmarks';
+import {fetchFolders, fetchTrades, findTradeByLocation} from '../lib/bookmarks';
 import {storage} from '../lib/ext';
 import {onPageChange} from '../lib/page-watch';
 import {fetchChaosRatios, type ChaosRatios} from '../lib/poe-ninja';
@@ -64,14 +64,24 @@ const lowestOf = (rows: Element[], ratios: ChaosRatios | null): {text: string; c
   return best && {text: best.text, chaos: best.chaos};
 };
 
-// "Showing 100 results (523 matched)" above the results; otherwise the results on the page.
+// The site's line above the results: "Showing 100 results (523 matched)", "Showing 32 results"
+// when that's all of them, or "No results found". Otherwise, the results on the page.
 const countOf = (rows: Element[]): {count: number; isCountExact: boolean} => {
-  const header = [...document.querySelectorAll('.results > :not(.resultset)')].map((element) => element.textContent || '').join(' ');
-  const matched = /([\d,.\s]+)\s+matched/i.exec(header);
-  const total = matched ? parseInt(matched[1].replace(/\D/g, ''), 10) : NaN;
+  const header = document.querySelector('.results > .row-total')?.textContent || '';
+  const found = /([\d,.]+)\s+matched/i.exec(header) || /showing\s+([\d,.]+)\s+results?/i.exec(header);
+  const total = found ? parseInt(found[1].replace(/\D/g, ''), 10) : /no results/i.test(header) ? 0 : NaN;
   if (Number.isFinite(total)) return {count: total, isCountExact: true};
   const hasMore = Boolean(document.querySelector('.resultset .load-more-btn'));
   return {count: rows.length, isCountExact: !hasMore};
+};
+
+// Drops what was saved for bookmarks that no longer exist.
+const withoutDeletedBookmarks = async (stats: Record<string, BookmarkStats>): Promise<Record<string, BookmarkStats>> => {
+  const ids = new Set<string>();
+  for (const folder of await fetchFolders()) {
+    if (folder.id) (await fetchTrades(folder.id)).forEach((trade) => trade.id && ids.add(trade.id));
+  }
+  return Object.fromEntries(Object.entries(stats).filter(([id]) => ids.has(id)));
 };
 
 // Which bookmark the open search is (looked up once per search).
@@ -83,7 +93,9 @@ const record = async () => {
   const location = currentLocation();
   if (!isEnabled('bookmark-prices') || location.type !== 'search' || !location.slug) return;
   const rows = [...document.querySelectorAll(ROWS)];
-  if (!rows.length || rows[0].classList.contains('exchange')) return;
+  if (rows[0]?.classList.contains('exchange')) return;
+  // Results loaded, or the site saying there are none (a search with no listings is worth knowing too).
+  if (!rows.length && !/no results/i.test(document.querySelector('.results > .row-total')?.textContent || '')) return;
 
   if (lookup?.slug !== location.slug) {
     const trade = await findTradeByLocation(location);
@@ -99,14 +111,16 @@ const record = async () => {
   if (signature === recorded) return;
   recorded = signature;
 
-  const stats = await fetchBookmarkStats();
+  // Read again: another trade tab may have saved since.
+  const stats = (await storage.get<Record<string, BookmarkStats>>(STATS_KEY)) || {};
   const before = stats[tradeId];
   const snapshot: BookmarkSnapshot = {lowest: lowest?.text || null, lowestChaos: lowest?.chaos ?? null, count, isCountExact, at: new Date().toISOString()};
   // The visit before this one is kept to show the change. Loading more of the same search
   // only updates this visit.
   const sameVisit = before && Date.now() - new Date(before.current.at).getTime() < 10 * 60 * 1000;
   stats[tradeId] = {current: snapshot, previous: sameVisit ? before.previous : before?.current || null};
-  await storage.set(STATS_KEY, stats);
+  cache = await withoutDeletedBookmarks(stats);
+  await storage.set(STATS_KEY, cache);
   emit('bookmark-stats-change');
 };
 
@@ -128,5 +142,11 @@ export default function setupBookmarkStats() {
     schedule();
   });
   on('settings-change', schedule);
+  // Coming back to this tab: pick up prices other trade tabs saved meanwhile.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    cache = null;
+    emit('bookmark-stats-change');
+  });
   schedule();
 }

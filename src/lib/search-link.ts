@@ -52,6 +52,16 @@ export const withTradeMode = async (slug: string, mode: string | null): Promise<
 };
 
 // Identifies a search regardless of its trade mode, for "is this the same search?" checks.
+// The same search can be written with its keys in another order.
+const canonical = (value: unknown): string => {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const entries = Object.keys(value as Json).sort().map((key) => `${JSON.stringify(key)}:${canonical((value as Json)[key])}`);
+    return `{${entries.join(',')}}`;
+  }
+  return JSON.stringify(value);
+};
+
 // Several features ask this for every bookmark on each page change, so answers are kept.
 const keys = new Map<string, Promise<string>>();
 const MAX_KEYS = 2000;
@@ -62,8 +72,8 @@ export const searchKey = (slug: string): Promise<string> => {
     if (keys.size >= MAX_KEYS) keys.clear();
     key = decodeSearch(slug).then((query) => {
       if (!query) return slug;
-      const {status: _status, ...rest} = query;
-      return JSON.stringify(rest);
+      const {status: _status, sort: _sort, ...rest} = query;
+      return canonical(rest);
     });
     keys.set(slug, key);
   }

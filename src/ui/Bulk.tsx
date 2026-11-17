@@ -11,6 +11,7 @@ import type {ChaosRatios} from '../lib/poe-ninja';
 import {currentLocation} from '../lib/trade-location';
 import {sleep, slugify} from '../lib/util';
 import {AlertMessage, flash} from './common';
+import {FaIcon} from './icons';
 
 interface Listing {
   id: string;
@@ -245,7 +246,7 @@ export function Bulk() {
         return (
           <div key={seller.account} class={`bt-bulk-seller ${isFolded ? 'is-folded' : ''}`}>
             <div class="bt-bulk-seller-header" onClick={() => toggle(seller.account)}>
-              <span class="bt-bulk-seller-arrow">{isFolded ? '▸' : '▾'}</span>
+              <FaIcon icon="chevron-down" class="bt-bulk-seller-arrow" />
               <span class="bt-bulk-seller-name">{seller.account}</span>
               <span class="bt-bulk-seller-count">{seller.listings.length}</span>
             </div>

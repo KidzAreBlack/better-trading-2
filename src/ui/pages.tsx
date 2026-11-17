@@ -4,9 +4,10 @@ import {addCustomSound, getCustomSounds, getSoundChoice, getVolume, listSounds, 
 import {local} from '../lib/ext';
 import {getHighlightColor, setHighlightColor} from '../lib/highlight-color';
 import {clearHistory, fetchHistory} from '../lib/history';
-import {isEnabled, setEnabled, SETTINGS, SETTINGS_SECTIONS} from '../lib/settings';
+import {isEnabled, setEnabled, SETTINGS, SETTINGS_SECTIONS, settingHint} from '../lib/settings';
 import {tradeUrl} from '../lib/trade-location';
 import {sleep, timeAgo} from '../lib/util';
+import {FaIcon} from './icons';
 import {AlertMessage, Button, Checkbox, flash, Mount, useLoaded, useTradeModeSlugs} from './common';
 
 declare const __VERSION__: string;
@@ -114,12 +115,14 @@ export function Settings() {
       {SETTINGS_SECTIONS.map((section) => (
         <section key={section.title} class={`bt-settings-section ${folded.has(section.title) ? 'is-folded' : ''}`}>
           <h2 class="bt-settings-section-title" onClick={() => toggle(section.title)}>
-            <span class="bt-settings-section-arrow">{folded.has(section.title) ? '\u25B8' : '\u25BE'}</span>
+            <FaIcon icon="chevron-down" class="bt-settings-section-arrow" />
             {section.title}
           </h2>
-          {!folded.has(section.title) && section.keys.map((key) => (
+          {!folded.has(section.title) && (
+            <div class="bt-settings-section-body">
+              {section.keys.map((key) => (
             <div key={key} class="bt-settings-row">
-              <Checkbox label={SETTINGS[key].label} value={isEnabled(key)} onChange={(value) => setEnabled(key, value)} />
+              <Checkbox label={SETTINGS[key].label} title={settingHint(key)} value={isEnabled(key)} onChange={(value) => setEnabled(key, value)} />
               {key === 'tier-search' && isEnabled('tier-search') && (
                 <div class="bt-settings-sub-option">
                   <Checkbox label={SETTINGS['advanced-filtering'].label} value={isEnabled('advanced-filtering')} onChange={(value) => setEnabled('advanced-filtering', value)} />
@@ -140,7 +143,9 @@ export function Settings() {
                 />
               )}
             </div>
-          ))}
+              ))}
+            </div>
+          )}
         </section>
       ))}
     </div>

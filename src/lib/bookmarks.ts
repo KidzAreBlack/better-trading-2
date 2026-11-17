@@ -32,6 +32,7 @@ const TRADES_KEY = 'bookmark-trades';
 const EXPANSION_KEY = 'bookmark-folders-expansion';
 const BUILD_KEY = 'bookmark-build';
 
+
 // Where a folder made by "Add build" came from, so it can be imported again later.
 export interface BuildSource {
   input: string; // the pasted pobb.in link or Path of Building code
@@ -168,7 +169,6 @@ export const findTradeByLocation = async (location: {
 
   const candidates = active.length ? active : archived;
   candidates.sort((a, b) => a.title.localeCompare(b.title));
-
   return candidates[0] || null;
 };
 

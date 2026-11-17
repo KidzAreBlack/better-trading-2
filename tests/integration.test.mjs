@@ -117,7 +117,7 @@ test('settings are off by default and turn features on', async () => {
     'Price summary above the results (lowest / median / highest)',
     'Group identical listings from the same seller',
     'Play a sound when a live search finds new items',
-    'Desktop notification when a live search finds new items (while the tab is in the background)',
+    'Live search desktop notification',
     'Show panel when hovering the icon', 'Show the lowest price and listing count on bookmarks', 'Back up bookmarks automatically (Downloads/Better Trading 2)',
     'Bookmarks', 'Pinned items', 'Bulk', 'History',
   ]);
@@ -1549,7 +1549,8 @@ test('Live search: new items above the shown ones play the sound once per batch,
   assert.ok(document.querySelector('.bt-live-alert-sound'));
   assert.match(document.querySelector('.bt-live-alert-hint').textContent, /bookmark's Edit window/);
   click(box('Play a sound'));
-  click(box('Desktop notification'));
+  assert.equal(box('Live search desktop notification').title, 'While the tab is in the background');
+  click(box('Live search desktop notification'));
   await sleep(50);
   addRow('new3', 'top');
   await sleep(700);
@@ -1645,4 +1646,34 @@ test('Price on bookmarks: opening a bookmarked search remembers its lowest price
   assert.match(line.textContent, /^5 c\u25BC · 1234 listings · /);
   assert.ok(line.querySelector('.is-down'));
   assert.equal(second.querySelector('.bt-folder-trade-stats'), null);
+});
+
+test('Price on bookmarks: the site rewriting the link in another order still finds the bookmark; "Showing N results" and no results are counted', async () => {
+  const slugOf = (query) => gzipSync(Buffer.from(JSON.stringify(query))).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  // The bookmark as saved, and the link the site turns it into (status first, keys moved).
+  const saved = slugOf({stats: [{type: 'and', filters: []}], filters: {type_filters: {filters: {rarity: {option: 'nonunique'}}}}, type: 'Archdemon Crown'});
+  const onPage = slugOf({status: {option: 'any'}, type: 'Archdemon Crown', filters: {type_filters: {filters: {rarity: {option: 'nonunique'}}}}, stats: [{filters: [], type: 'and'}]});
+  const {document, store} = await load({
+    path: `/trade/search/Standard/${onPage}`,
+    nodeStreams: true,
+    stored: {
+      'bookmark-folders': {value: [{id: 'f1', title: 'Gear', version: '1', icon: null, archivedAt: null}], expiresAt: null},
+      'bookmark-trades--f1': {value: [{id: 't1', title: 'Helmet', completedAt: null, location: {version: '1', type: 'search', slug: saved}}], expiresAt: null},
+    },
+  });
+  const header = document.createElement('div');
+  header.className = 'row row-total';
+  header.innerHTML = '<h3>Showing 32 results</h3>';
+  document.querySelector('.resultset').before(header);
+  await sleep(2000);
+  assert.equal(store['bookmark-stats']?.value.t1.current.count, 32);
+  assert.equal(store['bookmark-stats'].value.t1.current.isCountExact, true);
+  assert.match(document.title, /^Helmet - /, 'the tab title knows the bookmark too');
+
+  // A search with no listings is recorded as 0.
+  document.querySelectorAll('.resultset > div.row[data-id]').forEach((row) => row.remove());
+  header.innerHTML = '<h3>No results found</h3>';
+  await sleep(2000);
+  assert.equal(store['bookmark-stats'].value.t1.current.count, 0);
+  assert.equal(store['bookmark-stats'].value.t1.current.lowest, null);
 });
