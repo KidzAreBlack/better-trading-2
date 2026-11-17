@@ -1,7 +1,10 @@
 import {useEffect, useRef, useState} from 'preact/hooks';
 import * as bookmarks from '../lib/bookmarks';
 import {getAutoBackupStatus} from '../features/auto-backup';
-import type {BookmarkFolder, BookmarkTrade} from '../lib/bookmarks';
+import {fetchBookmarkStats} from '../features/bookmark-stats';
+import type {BookmarkStats} from '../features/bookmark-stats';
+import {listSounds, NO_SOUND, playAlertSound} from '../features/live-alert';
+import type {BookmarkFolder, BookmarkTrade, BuildSource} from '../lib/bookmarks';
 import {assetUrl} from '../lib/ext';
 import {createBuildFolder, listItemSets, loadBuild} from '../lib/pob-import';
 import type {ItemSetChoice} from '../lib/pob-import';
@@ -20,12 +23,19 @@ const FOLDERS_WARNING_THRESHOLD = 10;
 interface FolderWithTrades {
   folder: BookmarkFolder;
   trades: BookmarkTrade[];
+  build: BuildSource | null;
 }
 
 const loadAll = async (): Promise<FolderWithTrades[]> => {
   const folders = await bookmarks.fetchFolders();
 
-  return Promise.all(folders.map(async (folder) => ({folder, trades: folder.id ? await bookmarks.fetchTrades(folder.id) : []})));
+  return Promise.all(
+    folders.map(async (folder) => ({
+      folder,
+      trades: folder.id ? await bookmarks.fetchTrades(folder.id) : [],
+      build: folder.id ? await bookmarks.fetchBuildSource(folder.id) : null,
+    }))
+  );
 };
 
 // Moves `moved` to the position of `target` in the list.
@@ -99,6 +109,8 @@ export function Bookmarks() {
   const [stagedFolder, setStagedFolder] = useState<BookmarkFolder | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isAddingBuild, setIsAddingBuild] = useState(false);
+  // The build folder being imported again.
+  const [reimporting, setReimporting] = useState<FolderWithTrades | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const advancedFiltering = useLoaded(['settings-change'], isAdvancedFilteringOn, isAdvancedFilteringOn());
 
@@ -137,12 +149,31 @@ export function Bookmarks() {
     setIsImporting(false);
   };
 
-  const persistBuildFolder = async (folder: BookmarkFolder, trades: BookmarkTrade[]) => {
+  const persistBuildFolder = async (folder: BookmarkFolder, trades: BookmarkTrade[], source: BuildSource) => {
     const id = await bookmarks.saveFolder(folder);
+    await bookmarks.saveBuildSource(id, source);
     await bookmarks.saveTrades(trades, id);
     if (!expandedIds.includes(id)) updateExpanded([...expandedIds, id]);
     flash.success(`The folder "${folder.title}" has been created with ${trades.length} searches.`);
     setIsAddingBuild(false);
+  };
+
+  // Replaces the folder's searches with fresh ones from the build. A title or icon you changed
+  // yourself is kept; searches with the same name keep their "done" tick.
+  const persistReimport = async (made: BookmarkFolder, trades: BookmarkTrade[], source: BuildSource) => {
+    if (!reimporting) return;
+    const {folder, trades: previous, build} = reimporting;
+    const id = folder.id as string;
+    const title = !build || folder.title === build.title ? made.title : folder.title;
+    await bookmarks.saveFolder({...folder, title, icon: folder.icon || made.icon});
+    await bookmarks.saveBuildSource(id, source);
+    const done = new Map(previous.map((trade) => [trade.title, trade.completedAt]));
+    await bookmarks.saveTrades(
+      trades.map((trade) => ({...trade, completedAt: done.get(trade.title) ?? null})),
+      id
+    );
+    flash.success(`The folder "${title}" has been updated with ${trades.length} searches.`);
+    setReimporting(null);
   };
 
   const headerActions = (
@@ -167,7 +198,9 @@ export function Bookmarks() {
         {advancedFiltering ? <ModFilter trailing={headerActions} /> : <div class="bt-bookmarks-header-actions">{headerActions}</div>}
 
         <div class="bt-bookmarks-folders-wrapper">
-          {displayed.map(({folder, trades}) => (
+          {displayed.map((entry) => {
+            const {folder, trades} = entry;
+            return (
             <div
               key={folder.id}
               data-sortable
@@ -180,10 +213,12 @@ export function Bookmarks() {
                 league={location.league || (location.version === '2' ? 'poe2/Standard' : 'Standard')}
                 isExpanded={expandedIds.includes(folder.id as string)}
                 onEdit={() => setStagedFolder(folder)}
+                onReimport={entry.build ? () => setReimporting(entry) : undefined}
                 onExpansionToggle={() => toggleExpansion(folder.id as string)}
               />
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {!showingArchived && (
@@ -222,7 +257,15 @@ export function Bookmarks() {
         <BuildImport
           version={location.version}
           onCancel={() => setIsAddingBuild(false)}
-          onSubmit={(folder, trades) => void persistBuildFolder(folder, trades)}
+          onSubmit={(folder, trades, source) => void persistBuildFolder(folder, trades, source)}
+        />
+      )}
+      {reimporting && (
+        <BuildImport
+          version={reimporting.folder.version}
+          initial={reimporting.build as BuildSource}
+          onCancel={() => setReimporting(null)}
+          onSubmit={(folder, trades, source) => void persistReimport(folder, trades, source)}
         />
       )}
       {isImporting && <FolderImport onCancel={() => setIsImporting(false)} onSubmit={(result) => void persistImportedFolder(result)} />}
@@ -236,6 +279,7 @@ function Folder(props: {
   league: string;
   isExpanded: boolean;
   onEdit: () => void;
+  onReimport?: () => void;
   onExpansionToggle: () => void;
 }) {
   const {folder, trades, league} = props;
@@ -246,6 +290,8 @@ function Folder(props: {
   const [isDeletingFolder, setIsDeletingFolder] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const showPrices = useLoaded(['settings-change'], () => isEnabled('bookmark-prices'), isEnabled('bookmark-prices'));
+  const stats = useLoaded(['bookmark-stats-change'], fetchBookmarkStats, null);
 
   // Links open in the trade mode you are using now, not the one saved with them.
   const slugFor = useTradeModeSlugs(trades.map((trade) => ({key: trade.id as string, slug: trade.location.slug, version: trade.location.version})));
@@ -300,6 +346,7 @@ function Folder(props: {
               class="bt-folder-header-action"
               items={[
                 ...(isArchived ? [] : [{label: 'Edit', onClick: props.onEdit}]),
+                ...(!isArchived && props.onReimport ? [{label: 'Re-import build', onClick: props.onReimport}] : []),
                 {
                   label: isArchived ? 'Restore' : 'Archive',
                   onClick: () => void bookmarks.saveFolder({...folder, archivedAt: isArchived ? null : new Date().toUTCString()}, {moveToEnd: true}),
@@ -330,6 +377,7 @@ function Folder(props: {
                       </span>
                     )}
                     {trade.title}
+                    {showPrices && stats?.[trade.id as string] && <TradeStats stats={stats[trade.id as string]} />}
                   </a>
 
                   <div class="bt-folder-trade-actions">
@@ -430,12 +478,56 @@ function Folder(props: {
   );
 }
 
-function TradeEdition(props: {trade: BookmarkTrade; onSubmit: (trade: BookmarkTrade) => void}) {
-  const [title, setTitle] = useState(props.trade.title);
+// "12 c ▼ · 523 listings · 2 hours ago" under a bookmark, from the last time it was opened.
+function TradeStats(props: {stats: BookmarkStats}) {
+  const {current, previous} = props.stats;
+  let change: 'up' | 'down' | null = null;
+  if (previous?.lowestChaos != null && current.lowestChaos != null && previous.lowestChaos !== current.lowestChaos) {
+    change = current.lowestChaos < previous.lowestChaos ? 'down' : 'up';
+  }
+  const count = current.count === null ? null : `${current.count}${current.isCountExact ? '' : '+'} listing${current.count === 1 ? '' : 's'}`;
+  const when = timeAgo(current.at);
 
   return (
-    <Form canSubmit={Boolean(title)} onSubmit={() => props.onSubmit({...props.trade, title})}>
+    <span class="bt-folder-trade-stats" title={previous?.lowest && change ? `Lowest was ${previous.lowest} the time before` : undefined}>
+      {current.lowest && <span class="bt-folder-trade-stats-price">{current.lowest}</span>}
+      {change && <span class={`bt-folder-trade-stats-change is-${change}`}>{change === 'down' ? '\u25BC' : '\u25B2'}</span>}
+      {[count, when].filter(Boolean).map((part) => (
+        <span key={part}>{` \u00B7 ${part}`}</span>
+      ))}
+    </span>
+  );
+}
+
+function TradeEdition(props: {trade: BookmarkTrade; onSubmit: (trade: BookmarkTrade) => void}) {
+  const [title, setTitle] = useState(props.trade.title);
+  const [sound, setSound] = useState(props.trade.sound || '');
+  const sounds = useLoaded(['live-alert-change'], listSounds, []);
+
+  const submit = () => {
+    const {sound: _old, ...trade} = props.trade;
+    props.onSubmit(sound ? {...trade, title, sound} : {...trade, title});
+  };
+
+  return (
+    <Form canSubmit={Boolean(title)} onSubmit={submit}>
       <Input label="Title" value={title} autofocus onChange={setTitle} />
+      {isEnabled('live-alert-sound') && (
+        <Field label="Live search alert sound">
+          <div class="bt-live-alert-line">
+            <select class="bt-form-input bt-trade-sound" value={sound} onChange={(event) => setSound((event.target as HTMLSelectElement).value)}>
+              <option value="">Default (from Settings)</option>
+              {sounds.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+              <option value={NO_SOUND}>No sound</option>
+            </select>
+            <Button theme="blue" icon="play" onClick={() => void playAlertSound(sound || undefined)} />
+          </div>
+        </Field>
+      )}
       <Button type="submit" theme="gold" label="Save" icon="save" />
     </Form>
   );
@@ -501,9 +593,16 @@ function FolderImport(props: {onCancel: () => void; onSubmit: (result: [Bookmark
   );
 }
 
-function BuildImport(props: {version: TradeSiteVersion; onCancel: () => void; onSubmit: (folder: BookmarkFolder, trades: BookmarkTrade[]) => void}) {
-  const [input, setInput] = useState('');
-  const [percent, setPercent] = useState('80');
+function BuildImport(props: {
+  version: TradeSiteVersion;
+  // Re-importing: what the folder was made from.
+  initial?: BuildSource;
+  onCancel: () => void;
+  onSubmit: (folder: BookmarkFolder, trades: BookmarkTrade[], source: BuildSource) => void;
+}) {
+  const {initial} = props;
+  const [input, setInput] = useState(initial?.input || '');
+  const [percent, setPercent] = useState(String(initial?.minPercent ?? 80));
   const [build, setBuild] = useState<Document | null>(null);
   const [sets, setSets] = useState<ItemSetChoice[]>([]);
   const [setId, setSetId] = useState('');
@@ -533,7 +632,9 @@ function BuildImport(props: {version: TradeSiteVersion; onCancel: () => void; on
       const listed = listItemSets(result);
       setBuild(result);
       setSets(listed.sets);
-      setSetId(listed.active);
+      // Re-importing: the same loadout as last time, if the build still has it.
+      const previous = initial?.setTitle && listed.sets.find((set) => set.title === initial.setTitle);
+      setSetId(previous ? previous.id : listed.active);
     }, 300);
 
     return () => {
@@ -550,13 +651,16 @@ function BuildImport(props: {version: TradeSiteVersion; onCancel: () => void; on
     setIsWorking(false);
     if (typeof result === 'string') setError(result);
     else if (!result.trades.length) setError('No searches could be made from this loadout.');
-    else props.onSubmit(result.folder, result.trades);
+    else {
+      const setTitle = sets.find((set) => set.id === setId)?.title;
+      props.onSubmit(result.folder, result.trades, {input: input.trim(), setTitle, minPercent, title: result.folder.title});
+    }
   };
 
   return (
-    <Modal title="Add build" onClose={props.onCancel}>
+    <Modal title={initial ? 'Re-import build' : 'Add build'} onClose={props.onCancel}>
       <Form canSubmit={Boolean(build) && !isWorking} onSubmit={() => void submit()}>
-        <Input label="Path of Building code or pobb.in link" autofocus onChange={setInput} />
+        <Input label="Path of Building code or pobb.in link" value={input} autofocus onChange={setInput} />
         {sets.length > 1 && (
           <Field label="Loadout">
             <select class="bt-form-input bt-build-import-set" value={setId} onChange={(event) => setSetId((event.target as HTMLSelectElement).value)}>
@@ -572,10 +676,12 @@ function BuildImport(props: {version: TradeSiteVersion; onCancel: () => void; on
         <div class="bt-build-import-help">
           {isReading
             ? 'Reading build\u2026'
-            : `Makes a folder with a trade search for each item the build wears. Uniques are searched by name and their mods (any roll); other items by their mods, at ${minPercent}% of the build's values.`}
+            : initial
+              ? `Replaces this folder's searches with new ones made from the build. To update to a newer version of the build, paste its new code or link.`
+              : `Makes a folder with a trade search for each item the build wears. Uniques are searched by name and their mods (any roll); other items by their mods, at ${minPercent}% of the build's values.`}
         </div>
         {error && <AlertMessage type="alert" message={error} />}
-        <Button type="submit" theme="gold" label={isWorking ? 'Adding\u2026' : 'Add build'} icon="user-plus" />
+        <Button type="submit" theme="gold" label={isWorking ? (initial ? 'Updating\u2026' : 'Adding\u2026') : initial ? 'Re-import' : 'Add build'} icon="user-plus" />
       </Form>
     </Modal>
   );

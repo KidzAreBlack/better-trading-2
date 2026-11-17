@@ -41,6 +41,7 @@ interface ButtonProps {
   class?: string;
   onClick?: () => void;
   onFile?: (file: File) => void;
+  accept?: string; // file types for onFile (default: text files)
 }
 
 export function Button(props: ButtonProps) {
@@ -66,7 +67,7 @@ export function Button(props: ButtonProps) {
         <input
           class="bt-button-file-input"
           type="file"
-          accept="text/plain"
+          accept={props.accept || 'text/plain'}
           onChange={(event) => {
             const input = event.target as HTMLInputElement;
             if (input.files?.[0]) props.onFile?.(input.files[0]);

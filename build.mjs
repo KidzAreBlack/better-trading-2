@@ -22,7 +22,8 @@ const baseManifest = {
   homepage_url: 'https://github.com/KidzAreBlack/better-trading-2',
   icons: {16: 'assets/icon16.png', 32: 'assets/icon32.png', 48: 'assets/icon48.png', 128: 'assets/icon128.png'},
   // downloads: the automatic bookmark backup file (Downloads/Better Trading 2/backup.txt).
-  permissions: ['storage', 'downloads'],
+  // notifications: the optional desktop notification when a live search finds new items.
+  permissions: ['storage', 'downloads', 'notifications'],
   // Price data for the "equivalent prices" feature is fetched from poe.ninja by the background script.
   host_permissions: [NINJA_HOST, POBB_HOST],
   content_scripts: [

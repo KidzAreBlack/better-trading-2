@@ -25,8 +25,8 @@ const PAGE = `<!doctype html><html><head><title>Trade - Path of Exile</title></h
   <div class="results"><div class="resultset">${row}${secondRow}<div class="row controls"><button class="btn load-more-btn"><span>Load More</span></button></div></div></div>
 </div></div></body></html>`;
 
-const load = async ({path = '/trade/search/Standard/abc123', settings = [], rarityValue = '', script = '', local = {}, onFetch = null, onMessage = null, nodeStreams = false} = {}) => {
-  const store = {};
+const load = async ({path = '/trade/search/Standard/abc123', settings = [], rarityValue = '', script = '', local = {}, onFetch = null, onMessage = null, nodeStreams = false, stored = {}} = {}) => {
+  const store = JSON.parse(JSON.stringify(stored));
   const dom = new JSDOM(PAGE.replace('</body>', `${script}</body>`), {url: `https://www.pathofexile.com${path}`, runScripts: 'outside-only', pretendToBeVisual: true});
   const {window} = dom;
   window.chrome = {
@@ -88,7 +88,7 @@ test('sidebar renders beside the page and starts on Bookmarks', async () => {
 });
 
 test('settings are off by default and turn features on', async () => {
-  const {document} = await load();
+  const {document, window} = await load();
   const search = document.querySelector('.search-left input');
 
   type(search, 'bel');
@@ -100,14 +100,25 @@ test('settings are off by default and turn features on', async () => {
   await sleep(50);
   const box = (label) => [...document.querySelectorAll('.bt-form-checkbox')].find((b) => b.textContent.trim() === label);
   const isChecked = (label) => box(label).querySelector('.bt-form-checkbox-indicator').classList.contains('is-active');
-  assert.deepEqual([...document.querySelectorAll('.bt-settings-section-title')].map((h) => h.textContent), ['Search form', 'Results', 'Panel', 'Tabs']);
+  const titles = () => [...document.querySelectorAll('.bt-settings-section-title')];
+  assert.deepEqual(titles().map((h) => h.textContent.replace(/^[\u25B8\u25BE]/, '')), ['Search form', 'Results', 'Live search', 'Panel', 'Tabs']);
+  // Each section folds when its title is clicked, and stays folded (remembered).
+  click(titles()[2]);
+  await sleep(50);
+  assert.equal(document.querySelectorAll('.bt-settings-section')[2].querySelector('.bt-form-checkbox'), null);
+  assert.equal(window.localStorage.getItem('bt-settings-folded'), 'Live search');
+  click(titles()[2]);
+  await sleep(50);
+  assert.equal(window.localStorage.getItem('bt-settings-folded'), null);
   assert.deepEqual([...document.querySelectorAll('.bt-settings .bt-form-checkbox')].map((b) => b.textContent.trim()), [
     'Fuzzy search', 'Tier search', 'Stat filters are collapsible', 'Item rarity starts on Any Non-Unique',
     'Keep the search bar on screen while scrolling',
     'Highlight searched mods', 'Plus / Minus buttons on result mods', 'Equivalent prices (from poe.ninja)',
     'Price summary above the results (lowest / median / highest)',
     'Group identical listings from the same seller',
-    'Show panel when hovering the icon', 'Back up bookmarks automatically (Downloads/Better Trading 2)',
+    'Play a sound when a live search finds new items',
+    'Desktop notification when a live search finds new items (while the tab is in the background)',
+    'Show panel when hovering the icon', 'Show the lowest price and listing count on bookmarks', 'Back up bookmarks automatically (Downloads/Better Trading 2)',
     'Bookmarks', 'Pinned items', 'Bulk', 'History',
   ]);
   assert.equal(isChecked('Highlight searched mods'), true);
@@ -706,6 +717,10 @@ const TRADE_DATA = {
       {id: 'explicit.stat_gems', text: '+# to Level of Socketed Gems'},
       {id: 'explicit.stat_life_pct', text: '#% increased maximum Life'},
       {id: 'explicit.stat_life', text: '+# to maximum Life'},
+      {id: 'explicit.indexable_support_multistrike', text: 'Socketed Gems are Supported by Level # Multistrike Support'},
+      {id: 'explicit.indexable_support_pierce', text: 'Socketed Gems are Supported by Level # Pierce'},
+      {id: 'explicit.indexable_support_fork_a', text: 'Socketed Gems are Supported by Level # Fork'},
+      {id: 'explicit.indexable_support_fork_b', text: 'Socketed Gems are Supported by Level # Fork Support'},
       {id: 'explicit.stat_effect', text: '#% increased effect'},
       {id: 'explicit.stat_charge_hit', text: 'Gain # Charge when you are Hit by an Enemy'},
       {id: 'explicit.stat_duration', text: '#% increased Duration'},
@@ -782,8 +797,10 @@ test('Add build turns a Path of Building code into a folder of trade searches', 
   assert.deepEqual(ring.filters.type_filters.filters, {category: {option: 'accessory.ring'}});
   assert.deepEqual(ring.stats[0].filters, [{id: 'explicit.stat_es', value: {min: 72}}]);
 
+  // A real base type is searched exactly (Hubris Circlet), not the whole helmet category.
   const helmet = decodeSlug(trades[1].location.slug);
-  assert.deepEqual(helmet.filters.type_filters.filters, {rarity: {option: 'nonunique'}, category: {option: 'armour.helmet'}});
+  assert.equal(helmet.type, 'Hubris Circlet');
+  assert.deepEqual(helmet.filters.type_filters.filters, {rarity: {option: 'nonunique'}});
   assert.deepEqual(helmet.stats[0].filters, [
     {id: 'explicit.stat_es_local', value: {min: 72}}, // armour uses the local stat; 80% of 90
     {id: 'explicit.stat_fire', value: {min: 33}},
@@ -1123,9 +1140,26 @@ test('Bulk counts listings per seller; tabs can be turned off; Pinned is off by 
   const extra = rows[3].cloneNode(true);
   extra.setAttribute('data-id', 'extra');
   setSeller(extra, 'SellerB#2');
+  extra.querySelector('[data-field="price"] > br + span').textContent = '20';
   rows[3].parentNode.append(extra);
   await sleep(300);
   assert.deepEqual(counts(), ['SellerA#1 2', 'SellerB#2 2']);
+
+  // Each card shows what the seller's listings cost together, and sellers can be sorted by it.
+  const totals = () => [...document.querySelectorAll('.bt-bulk-seller-total')].map((t) => t.textContent.replace(/\s+/g, ' ').trim());
+  assert.deepEqual(totals(), ['Total:10', 'Total:25']); // the gap is CSS spacing
+  const sortBy = async (label) => {
+    const select = document.querySelector('.bt-bulk-sort-select');
+    select.value = [...select.options].find((option) => option.textContent === label).value;
+    select.dispatchEvent(new window.Event('change', {bubbles: true}));
+    await sleep(50);
+  };
+  await sortBy('Highest total price');
+  assert.deepEqual(counts(), ['SellerB#2 2', 'SellerA#1 2']);
+  await sortBy('Lowest total price');
+  assert.deepEqual(counts(), ['SellerA#1 2', 'SellerB#2 2']);
+  assert.equal(window.localStorage.getItem('bt-bulk-sort'), 'lowest', 'the choice is remembered');
+  await sortBy('Most listings');
 
   // Settings > Tabs: turn Pinned on and History off.
   click(tab(document, 'Settings'));
@@ -1315,4 +1349,300 @@ test('price summary: lowest, median and highest of the loaded results, in Chaos 
   click([...document.querySelectorAll('.bt-settings .bt-form-checkbox')].find((b) => b.textContent.trim().startsWith('Price summary')));
   await sleep(100);
   assert.equal(document.querySelector('.bt-price-summary'), null);
+});
+
+test('Add build: a Foulborn unique is searched under its unique name, with its changed mod', async () => {
+  const xml = `<PathOfBuilding>
+<Build className="Marauder" ascendClassName="Juggernaut" level="90"/>
+<Items activeItemSet="1">
+<Item id="1">Rarity: UNIQUE
+Foulborn Kaom's Heart
+Glorious Plate
+Implicits: 0
++(500-600) to maximum Life
+{mutated}+42% to Fire Resistance</Item>
+<ItemSet id="1" title="Main"><Slot name="Body Armour" itemId="1"/></ItemSet>
+</Items>
+</PathOfBuilding>`;
+  const {document, window, store} = await load({onFetch: tradeData, nodeStreams: true});
+  await addBuild(document, window, deflateSync(Buffer.from(xml)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_'));
+  const folder = store['bookmark-folders'].value[0];
+  const [trade] = store[`bookmark-trades--${folder.id}`].value;
+
+  assert.equal(trade.title, "Body Armour: Foulborn Kaom's Heart");
+  const query = decodeSlug(trade.location.slug);
+  assert.equal(query.name, "Kaom's Heart", 'the trade site knows it as the plain unique name');
+  assert.equal(query.type, 'Glorious Plate');
+  // Its own mods, the changed one included (that's what sets the Foulborn version apart).
+  assert.deepEqual(query.stats[0].filters.map((f) => f.id), ['explicit.stat_life', 'explicit.stat_fire']);
+});
+
+test('Add build: a rare named "New Item" (made in Path of Building) is titled by its base type', async () => {
+  const xml = `<PathOfBuilding>
+<Build className="Witch" ascendClassName="Necromancer" level="90"/>
+<Items activeItemSet="1">
+<Item id="1">Rarity: RARE
+New Item
+Hubris Circlet
+Implicits: 0
++90 to maximum Life</Item>
+<Item id="2">Rarity: RARE
+Doom Crown
+Hubris Circlet
+Implicits: 0
++90 to maximum Life</Item>
+<ItemSet id="1" title="Main"><Slot name="Helmet" itemId="1"/><Slot name="Helmet Swap" itemId="2"/></ItemSet>
+</Items>
+</PathOfBuilding>`;
+  const {document, window, store} = await load({onFetch: tradeData, nodeStreams: true});
+  await addBuild(document, window, deflateSync(Buffer.from(xml)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_'));
+  const folder = store['bookmark-folders'].value[0];
+  const trades = store[`bookmark-trades--${folder.id}`].value;
+  assert.equal(trades[0].title, 'Helmet: Hubris Circlet');
+  assert.equal(decodeSlug(trades[0].location.slug).type, 'Hubris Circlet');
+});
+
+test('Add build: "Socketed Gems are Supported by" mods match with or without " Support" at the end', async () => {
+  const xml = `<PathOfBuilding>
+<Build className="Ranger" ascendClassName="Deadeye" level="90"/>
+<Items activeItemSet="1">
+<Item id="1">Rarity: RARE
+New Item
+Hubris Circlet
+Implicits: 0
+Socketed Gems are Supported by Level 20 Multistrike
+Socketed Gems are Supported by Level 18 Pierce
+Socketed Gems are Supported by Level 16 Fork</Item>
+<ItemSet id="1" title="Main"><Slot name="Helmet" itemId="1"/></ItemSet>
+</Items>
+</PathOfBuilding>`;
+  const {document, window, store} = await load({onFetch: tradeData, nodeStreams: true});
+  await addBuild(document, window, deflateSync(Buffer.from(xml)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_'));
+  const folder = store['bookmark-folders'].value[0];
+  const [trade] = store[`bookmark-trades--${folder.id}`].value;
+  const stats = decodeSlug(trade.location.slug).stats;
+  assert.deepEqual(stats[0].filters.map((f) => f.id), [
+    'explicit.indexable_support_multistrike', // only listed as "... Multistrike Support"
+    'explicit.indexable_support_pierce', // only listed as "... Pierce"
+  ]);
+  // Listed both ways: a Count group, so a listing with either one matches.
+  assert.deepEqual(stats[1], {
+    type: 'count',
+    value: {min: 1},
+    filters: [{id: 'explicit.indexable_support_fork_a', value: {min: 12}}, {id: 'explicit.indexable_support_fork_b', value: {min: 12}}], // 80% of 16
+  });
+});
+
+test('Add build: the ascendancy is read from the loadout tree when the build leaves it out', async () => {
+  const xml = `<PathOfBuilding>
+<Build className="Marauder" ascendClassName="None" level="90"/>
+<Tree activeSpec="1">
+<Spec title="Lvl 90" treeVersion="3_29" classId="1" ascendClassId="1"><Sockets/></Spec>
+</Tree>
+<Items activeItemSet="1">
+<Item id="1">Rarity: RARE
+New Item
+Hubris Circlet
+Implicits: 0
++90 to maximum Life</Item>
+<ItemSet id="1" title="Lvl 90"><Slot name="Helmet" itemId="1"/></ItemSet>
+</Items>
+</PathOfBuilding>`;
+  const {document, window, store} = await load({onFetch: tradeData, nodeStreams: true});
+  await addBuild(document, window, deflateSync(Buffer.from(xml)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_'));
+  const folder = store['bookmark-folders'].value[0];
+  assert.equal(folder.title, 'Juggernaut'); // one loadout: no loadout name added
+  assert.equal(folder.icon, 'juggernaut');
+});
+
+test('Re-import build: a build folder can be made again from its source, keeping your title and ticks', async () => {
+  const {document, window, store} = await load({onFetch: tradeData, nodeStreams: true});
+  await addBuild(document, window, POB_CODE, 'Leveling');
+
+  const folder = store['bookmark-folders'].value[0];
+  assert.equal(folder.title, 'Deadeye – Leveling');
+  assert.deepEqual(store[`bookmark-build--${folder.id}`].value, {input: POB_CODE, setTitle: 'Leveling', minPercent: 80, title: 'Deadeye – Leveling'});
+  // Rename it and tick its search as done.
+  const trades = store[`bookmark-trades--${folder.id}`].value;
+  store['bookmark-folders'].value = [{...folder, title: 'My leveling gear'}];
+  store[`bookmark-trades--${folder.id}`].value = trades.map((t) => ({...t, completedAt: 'Mon, 16 Nov 2026 00:00:00 GMT'}));
+  // Leave the tab and come back so the panel reads the changed storage.
+  click(tab(document, 'History'));
+  await sleep(50);
+  click(tab(document, 'Bookmarks'));
+  await sleep(150);
+
+  document.querySelector('.bt-folder-header .bt-contextual-menu').dispatchEvent(new window.MouseEvent('click', {bubbles: true, clientX: 300, clientY: 100}));
+  await sleep(50);
+  const items = [...document.querySelectorAll('.bt-contextual-menu-item')];
+  assert.deepEqual(items.map((item) => item.textContent.trim()), ['Edit', 'Re-import build', 'Archive', 'Export/Share', 'Delete']);
+  assert.ok(items.some((item) => item.textContent.trim() === 'Re-import build'));
+  click(items.find((item) => item.textContent.trim() === 'Re-import build'));
+  await sleep(500);
+  const modal = document.querySelector('.bt-modal-container');
+  assert.match(modal.textContent, /Re-import build/);
+  // The same code, loadout and percentage as before.
+  assert.equal(modal.querySelector('input').value, POB_CODE);
+  assert.equal(modal.querySelector('.bt-build-import-set').selectedOptions[0].textContent, 'Leveling');
+  // Pick the other loadout this time.
+  const select = modal.querySelector('.bt-build-import-set');
+  select.value = [...select.options].find((option) => option.textContent === 'Endgame').value;
+  select.dispatchEvent(new window.Event('change', {bubbles: true}));
+  await sleep(30);
+  modal.querySelector('form').dispatchEvent(new window.Event('submit', {bubbles: true, cancelable: true}));
+  await sleep(300);
+
+  const folders = store['bookmark-folders'].value;
+  assert.equal(folders.length, 1); // updated in place, not a second folder
+  assert.equal(folders[0].title, 'My leveling gear'); // your own title kept
+  const updated = store[`bookmark-trades--${folder.id}`].value;
+  assert.equal(updated.length, 6);
+  // Only searches with the same name as before keep their tick: the tree jewel is in both loadouts.
+  assert.deepEqual(updated.filter((t) => t.completedAt).map((t) => t.title), ['Jewel: Dusk Delirium (Viridian Jewel)']);
+  assert.equal(store[`bookmark-build--${folder.id}`].value.setTitle, 'Endgame');
+});
+
+test('Live search: new items above the shown ones play the sound once per batch, and notify in the background', async () => {
+  const messages = [];
+  const {document, window} = await load({path: '/trade/search/Standard/abc123/live', settings: ['live-alert-notification'], onMessage: (m) => (messages.push(m), true)});
+  // A stand-in for the browser's audio: counts the sounds started.
+  let played = 0;
+  class FakeAudio {
+    constructor() { this.state = 'running'; this.currentTime = 0; this.destination = {}; }
+    createGain() { return {gain: {value: 1, setValueAtTime() {}, exponentialRampToValueAtTime() {}}, connect() {}}; }
+    createOscillator() { return {type: '', frequency: {}, connect() {}, start: () => played++, stop() {}}; }
+    async resume() {}
+  }
+  window.AudioContext = FakeAudio;
+  await sleep(200);
+
+  const resultset = document.querySelector('.resultset');
+  const first = resultset.querySelector('div.row[data-id]');
+  const addRow = (id, where) => {
+    const row = first.cloneNode(true);
+    row.removeAttribute('bt-enhanced');
+    row.setAttribute('data-id', id);
+    if (where === 'top') resultset.prepend(row);
+    else resultset.querySelector('.row.controls').before(row);
+  };
+
+  // "Load more" adds below the shown items: no alert.
+  addRow('more1', 'bottom');
+  await sleep(600);
+  assert.equal(played, 0);
+
+  // Two new items arrive at the top together: one sound (the chime's two notes), one notification.
+  document.hasFocus = () => false;
+  addRow('new1', 'top');
+  addRow('new2', 'top');
+  await sleep(700);
+  assert.equal(played, 2);
+  const notes = messages.filter((m) => m.query === 'notify');
+  assert.equal(notes.length, 1);
+  assert.equal(notes[0].title, 'Live search: 2 new items');
+
+  // Turned off: nothing.
+  click(tab(document, 'Settings'));
+  await sleep(50);
+  const box = (label) => [...document.querySelectorAll('.bt-settings .bt-form-checkbox')].find((b) => b.textContent.trim().startsWith(label));
+  // The sound options show under the sound setting.
+  assert.ok(document.querySelector('.bt-live-alert-sound'));
+  assert.match(document.querySelector('.bt-live-alert-hint').textContent, /bookmark's Edit window/);
+  click(box('Play a sound'));
+  click(box('Desktop notification'));
+  await sleep(50);
+  addRow('new3', 'top');
+  await sleep(700);
+  assert.equal(played, 2);
+  assert.equal(messages.filter((m) => m.query === 'notify').length, 1);
+});
+
+test('Live search: a bookmarked search plays the sound picked on its bookmark', async () => {
+  const messages = [];
+  const trade = (id, title, slug, sound) => ({id, title, completedAt: null, location: {version: '1', type: 'search', slug}, ...(sound ? {sound} : {})});
+  const {document, window, store} = await load({
+    path: '/trade/search/Standard/abc123/live',
+    settings: ['live-alert-notification'],
+    onMessage: (m) => (messages.push(m), true),
+    stored: {
+      'bookmark-folders': {value: [{id: 'f1', title: 'Gear', version: '1', icon: null, archivedAt: null}], expiresAt: null},
+      'bookmark-trades--f1': {value: [trade('t1', 'Cheap Mageblood', 'abc123', 'ding'), trade('t2', 'Other', 'zzz999')], expiresAt: null},
+    },
+  });
+  const notes = [];
+  class FakeAudio {
+    constructor() { this.state = 'running'; this.currentTime = 0; this.destination = {}; }
+    createGain() { return {gain: {value: 1, setValueAtTime() {}, exponentialRampToValueAtTime() {}}, connect() {}}; }
+    createOscillator() { const o = {type: '', frequency: {}, connect() {}, start: () => notes.push(o.type), stop() {}}; return o; }
+    async resume() {}
+  }
+  window.AudioContext = FakeAudio;
+  await sleep(200);
+
+  // The page says which sound this live search uses.
+  assert.match(document.querySelector('.bt-live-alert-badge').textContent, /Live alert: Ding \(bookmark .Cheap Mageblood.\)/);
+
+  const resultset = document.querySelector('.resultset');
+  const row = resultset.querySelector('div.row[data-id]').cloneNode(true);
+  row.removeAttribute('bt-enhanced');
+  row.setAttribute('data-id', 'new1');
+  document.hasFocus = () => false;
+  resultset.prepend(row);
+  await sleep(700);
+  assert.deepEqual(notes, ['triangle'], 'the Ding, not the default Chime');
+  assert.equal(messages.filter((m) => m.query === 'notify')[0].title, 'Cheap Mageblood: new item');
+
+  // The bookmark's Edit window offers the sounds, with Default and No sound; pick Beep.
+  if (!document.querySelector('.bt-folder-trade')) click(document.querySelector('.bt-folder-header-label'));
+  await sleep(50);
+  document.querySelector('.bt-folder-trade-actions .bt-contextual-menu').dispatchEvent(new window.MouseEvent('click', {bubbles: true, clientX: 300, clientY: 100}));
+  await sleep(50);
+  click([...document.querySelectorAll('.bt-contextual-menu-item')].find((item) => item.textContent.trim() === 'Edit'));
+  await sleep(50);
+  const select = document.querySelector('.bt-trade-sound');
+  assert.deepEqual([...select.options].map((o) => o.textContent), ['Default (from Settings)', 'Chime', 'Ding', 'Beep', 'No sound']);
+  assert.equal(select.value, 'ding');
+  select.value = 'beep';
+  select.dispatchEvent(new window.Event('change', {bubbles: true}));
+  await sleep(30);
+  document.querySelector('.bt-modal-container form').dispatchEvent(new window.Event('submit', {bubbles: true, cancelable: true}));
+  await sleep(150);
+  assert.equal(store['bookmark-trades--f1'].value[0].sound, 'beep');
+  assert.match(document.querySelector('.bt-live-alert-badge').textContent, /Live alert: Beep/);
+  assert.equal(store['bookmark-trades--f1'].value[1].sound, undefined, 'other bookmarks keep the default');
+});
+
+test('Price on bookmarks: opening a bookmarked search remembers its lowest price and listing count', async () => {
+  const trade = (id, title, slug) => ({id, title, completedAt: null, location: {version: '1', type: 'search', slug}});
+  const previousVisit = {lowest: '9 c', lowestChaos: 9, count: 40, isCountExact: true, at: new Date(Date.now() - 86400000).toISOString()};
+  const {document, store} = await load({
+    path: '/trade/search/Standard/abc123',
+    onMessage: (m) => (m.query === 'poe-ninja' ? {lines: [{id: 'chaos', primaryValue: 1}, {id: 'divine', primaryValue: 200}], items: [{id: 'chaos', name: 'Chaos Orb'}, {id: 'divine', name: 'Divine Orb'}]} : null),
+    stored: {
+      'bookmark-folders': {value: [{id: 'f1', title: 'Gear', version: '1', icon: null, archivedAt: null}], expiresAt: null},
+      'bookmark-trades--f1': {value: [trade('t1', 'Cheap Mageblood', 'abc123'), trade('t2', 'Not opened', 'zzz999')], expiresAt: null},
+      'bookmark-stats': {value: {t1: {current: previousVisit, previous: null}}, expiresAt: null},
+    },
+  });
+  // The site's line above the results.
+  const header = document.createElement('div');
+  header.className = 'row row-total';
+  header.innerHTML = '<h3>Showing 2 results <small>(1,234 matched)</small></h3>';
+  document.querySelector('.resultset').before(header);
+  await sleep(2000);
+
+  const saved = store['bookmark-stats'].value.t1;
+  assert.equal(saved.current.lowest, '5 c'); // the result rows are priced 5 Chaos
+  assert.equal(saved.current.count, 1234);
+  assert.deepEqual(saved.previous, previousVisit, 'yesterday\'s visit is kept to compare with');
+  assert.equal(store['bookmark-stats'].value.t2, undefined);
+
+  // Shown under the bookmark, with ▼ since the lowest price went down.
+  if (!document.querySelector('.bt-folder-trade')) click(document.querySelector('.bt-folder-header-label'));
+  await sleep(100);
+  const [first, second] = document.querySelectorAll('.bt-folder-trade');
+  const line = first.querySelector('.bt-folder-trade-stats');
+  assert.match(line.textContent, /^5 c\u25BC · 1234 listings · /);
+  assert.ok(line.querySelector('.is-down'));
+  assert.equal(second.querySelector('.bt-folder-trade-stats'), null);
 });

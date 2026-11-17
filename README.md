@@ -14,6 +14,10 @@ single codebase. It keeps the original's look and adds a few search tools on top
 - **Bookmarks**: folders of saved searches, drag to reorder, archive, delete, export/share strings and a
   backup file. Backup files and share strings from the original Better Trading import as-is. Bookmarks don't
   save the trade mode: they (and History links) open in whichever mode you're using, In Person or Instant Buyout.
+- **Price on bookmarks**: when you open a bookmarked search, its lowest price and how many listings it
+  matched are remembered and shown under the bookmark (e.g. "12 c ▼ · 523 listings · 2 hours ago"), with
+  ▼ / ▲ when the lowest price went down or up since the visit before. Mixed currencies are compared with
+  poe.ninja rates (PoE 1). A setting, on by default.
 - **Automatic backup**: a few seconds after your bookmarks change, they're saved to
   `Downloads/Better Trading 2/backup.txt` (one file, overwritten each time). Restore it with Backup tools >
   Restore from file. Can be turned off in Settings.
@@ -24,10 +28,16 @@ single codebase. It keeps the original's look and adds a few search tools on top
   Implicits and enchantments are added too, but unticked, so you can switch them on (a cluster jewel's stay ticked). Example items are handled too:
   rare names are never searched for, an invented base falls back to the slot's item type, and a unique that
   doesn't exist is searched by its mods. Searches are built locally, so importing never uses up the trade
-  site's search limit.
-- **Bulk**: sellers with more than one listing in the current search, most first. Each seller is a card
-  (click its heading to fold it) with each listing's price, **Find** (jump to the listing) and **Buy** (presses
-  the listing's own Travel to Hideout / Direct Whisper button).
+  site's search limit. A build folder's menu has **Re-import build**: it makes the searches again (same
+  code, loadout and percentage, or paste a newer code), keeping the folder's title if you renamed it.
+- **Bulk**: sellers with more than one listing in the current search. Each seller is a card
+  (click its heading to fold it) with each listing's price, what all their listings cost together, **Find**
+  (jump to the listing) and **Buy** (presses the listing's own Travel to Hideout / Direct Whisper button).
+  Sort by most listings, or by lowest or highest total price (mixed currencies compared with poe.ninja rates).
+- **Live search alerts**: a sound when a live search finds new items (Chime, Ding, Beep, or your own mp3 /
+  wav / ogg files up to 1 MB each, with a volume slider), and optionally a desktop notification while the
+  trade tab is in the background (click it to go back to the tab). Each bookmark can have its own sound (or
+  none), picked in its Edit window; a line above the live results shows which sound that search uses.
 - **History** of the searches you run, shown as plain text, and **pinned items** for comparing results.
 - **Tabs**: choose which tabs the panel shows in Settings. Bookmarks, Bulk, History and Settings show by default;
   Pinned items is off until you turn it on.
@@ -137,7 +147,9 @@ data with `python3 scripts/build-tier-data.py <RePoE data folder> assets/data/po
   settings, `src/features` the search tools, `src/enhancers` the result extras, and `src/content.css`
   all styles.
 - `src/background.ts`: fetches poe.ninja prices and pobb.in builds for the page (content scripts cannot
-  call other sites directly). `src/lib/pob-import.ts` turns a Path of Building build into searches.
+  call other sites directly), writes the automatic backup file, and shows live search notifications.
+  `src/lib/pob-import.ts` turns a Path of Building build into searches.
+- `src/page-world.ts`: runs inside the page itself, to add stat filters to the site's search form.
 - `build.mjs`: the build and both manifests. `scripts/package.mjs`: the release zips.
 - `tests/`: integration tests run with jsdom.
 

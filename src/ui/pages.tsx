@@ -1,5 +1,7 @@
 import {clearPinnedItems, getPinnedItems, unpinItem} from '../enhancers';
 import {useState} from 'preact/hooks';
+import {addCustomSound, getCustomSounds, getSoundChoice, getVolume, listSounds, playAlertSound, removeCustomSound, renameCustomSound, setSoundChoice, setVolume} from '../features/live-alert';
+import {local} from '../lib/ext';
 import {getHighlightColor, setHighlightColor} from '../lib/highlight-color';
 import {clearHistory, fetchHistory} from '../lib/history';
 import {isEnabled, setEnabled, SETTINGS, SETTINGS_SECTIONS} from '../lib/settings';
@@ -90,16 +92,32 @@ export function PinnedItems() {
   );
 }
 
+// Settings sections you folded (remembered in this browser).
+const FOLDED_KEY = 'settings-folded';
+const readFolded = () => new Set((local.get(FOLDED_KEY) || '').split('|').filter(Boolean));
+
 export function Settings() {
   useLoaded(['settings-change'], () => Date.now(), 0);
   const [color, setColor] = useState(getHighlightColor());
+  const [folded, setFolded] = useState(readFolded);
+
+  const toggle = (title: string) => {
+    const next = new Set(folded);
+    if (next.has(title)) next.delete(title);
+    else next.add(title);
+    local.set(FOLDED_KEY, [...next].join('|') || null);
+    setFolded(next);
+  };
 
   return (
     <div class="bt-settings">
       {SETTINGS_SECTIONS.map((section) => (
-        <section key={section.title} class="bt-settings-section">
-          <h2 class="bt-settings-section-title">{section.title}</h2>
-          {section.keys.map((key) => (
+        <section key={section.title} class={`bt-settings-section ${folded.has(section.title) ? 'is-folded' : ''}`}>
+          <h2 class="bt-settings-section-title" onClick={() => toggle(section.title)}>
+            <span class="bt-settings-section-arrow">{folded.has(section.title) ? '\u25B8' : '\u25BE'}</span>
+            {section.title}
+          </h2>
+          {!folded.has(section.title) && section.keys.map((key) => (
             <div key={key} class="bt-settings-row">
               <Checkbox label={SETTINGS[key].label} value={isEnabled(key)} onChange={(value) => setEnabled(key, value)} />
               {key === 'tier-search' && isEnabled('tier-search') && (
@@ -107,6 +125,7 @@ export function Settings() {
                   <Checkbox label={SETTINGS['advanced-filtering'].label} value={isEnabled('advanced-filtering')} onChange={(value) => setEnabled('advanced-filtering', value)} />
                 </div>
               )}
+              {key === 'live-alert-sound' && isEnabled('live-alert-sound') && <LiveAlertSoundOptions />}
               {key === 'highlight-stat-filters' && (
                 <input
                   type="color"
@@ -124,6 +143,73 @@ export function Settings() {
           ))}
         </section>
       ))}
+    </div>
+  );
+}
+
+// The default live search alert sound, the volume, and your own sounds.
+// Each bookmark can use a different sound (Edit on the bookmark).
+function LiveAlertSoundOptions() {
+  const choice = useLoaded(['live-alert-change'], getSoundChoice, getSoundChoice());
+  const volume = useLoaded(['live-alert-change'], getVolume, getVolume());
+  const sounds = useLoaded(['live-alert-change'], listSounds, []);
+  const customs = useLoaded(['live-alert-change'], getCustomSounds, []);
+
+  const addFile = async (file: File) => {
+    const problem = await addCustomSound(file);
+    if (problem) flash.alert(problem);
+    else flash.success(`"${file.name}" was added to your sounds.`);
+  };
+
+  return (
+    <div class="bt-settings-sub-option bt-live-alert-options">
+      <div class="bt-live-alert-line">
+        Default
+        <select class="bt-form-input bt-live-alert-sound" value={choice} onChange={(event) => setSoundChoice((event.target as HTMLSelectElement).value)}>
+          {sounds.map((sound) => (
+            <option key={sound.value} value={sound.value}>
+              {sound.label}
+            </option>
+          ))}
+        </select>
+        <Button theme="blue" class="bt-live-alert-test" label="Test" icon="play" onClick={() => void playAlertSound()} />
+      </div>
+      <label class="bt-live-alert-line bt-live-alert-volume">
+        Volume
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={volume}
+          onChange={(event) => {
+            setVolume(Number((event.target as HTMLInputElement).value));
+            void playAlertSound();
+          }}
+        />
+        <span class="bt-live-alert-volume-value">{volume}%</span>
+      </label>
+      {customs.length > 0 && (
+        <div class="bt-live-alert-customs">
+          <div class="bt-live-alert-customs-title">Your sounds</div>
+          {customs.map((sound) => (
+            <div key={sound.id} class="bt-live-alert-line bt-live-alert-custom">
+              <input
+                type="text"
+                class="bt-form-input bt-live-alert-custom-name"
+                value={sound.name}
+                title="Rename"
+                onChange={(event) => void renameCustomSound(sound.id, (event.target as HTMLInputElement).value)}
+              />
+              <Button theme="blue" icon="play" onClick={() => void playAlertSound(`custom:${sound.id}`)} />
+              <Button theme="red" icon="times" onClick={() => void removeCustomSound(sound.id)} />
+            </div>
+          ))}
+        </div>
+      )}
+      <div class="bt-live-alert-line">
+        <Button theme="blue" label="Add a sound\u2026" icon="file-import" accept="audio/*" onFile={(file) => void addFile(file)} />
+      </div>
+      <div class="bt-live-alert-hint">Pick a different sound for a search in its bookmark's Edit window.</div>
     </div>
   );
 }

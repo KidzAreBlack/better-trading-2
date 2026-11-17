@@ -7,7 +7,9 @@ import setupDefaultRarity from './features/default-rarity';
 import setupSidebarScroll from './features/sidebar-scroll';
 import fitTradePage from './features/fit-trade-page';
 import setupAutoBackup from './features/auto-backup';
+import setupBookmarkStats from './features/bookmark-stats';
 import setupFuzzySearch from './features/fuzzy-search';
+import setupLiveAlert from './features/live-alert';
 import setupPriceSummary from './features/price-summary';
 import setupStickySearch from './features/sticky-search';
 import setupModFilter from './features/mod-filter';
@@ -43,11 +45,13 @@ const start = () => {
   setupEnhancers();
   setupPriceSummary();
   setupStickySearch();
+  setupLiveAlert();
   setupPageTitle();
 
   watchLocation();
   setupHistory();
   setupAutoBackup();
+  setupBookmarkStats();
   setupTradeModeTracking();
 };
 

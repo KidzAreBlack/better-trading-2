@@ -64,7 +64,7 @@ const isSupportedSite = () => !/^\/trade2/.test(window.location.pathname);
 
 // ---- Reading the page -------------------------------------------------------
 
-export const readStatText = (row: Element): string | null => {
+const readStatText = (row: Element): string | null => {
   const title = row.querySelector('.filter-title');
   if (!title) return null;
 
@@ -116,7 +116,7 @@ export interface ItemHint {
   from: string; // what was recognised, for the note in the popup
 }
 
-export const readSearchHint = (): ItemHint | null => {
+const readSearchHint = (): ItemHint | null => {
   const words = (getName() || '').toLowerCase().split(/\s+/).filter(Boolean);
   if (!words.length) return null;
   const text = ` ${words.join(' ')} `;
@@ -156,7 +156,7 @@ const summarize = (labels: string[]) => {
   return `${unique.slice(0, 3).join(', ')} +${unique.length - 3}`;
 };
 
-export const findSections = (statText: string, category: string, sub = ''): TierSection[] => {
+const findSections = (statText: string, category: string, sub = ''): TierSection[] => {
   const families = DATA.stats[statText];
   if (!families) return [];
 
@@ -222,7 +222,7 @@ const queryParts = (query: string) =>
     .map((part) => part.trim())
     .filter(Boolean);
 
-export const resultFilterTerm = (statText: string, kind: string, tier: number): string => {
+const resultFilterTerm = (statText: string, kind: string, tier: number): string => {
   const words = statText
     .replace(/[^a-z0-9' ]+/g, ' ')
     .split(' ')

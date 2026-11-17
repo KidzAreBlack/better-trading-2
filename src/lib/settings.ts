@@ -12,11 +12,14 @@ export const SETTINGS = {
   'default-non-unique': {label: 'Item rarity starts on Any Non-Unique', defaultOn: false},
   'sticky-search': {label: 'Keep the search bar on screen while scrolling', defaultOn: false},
   'hover-open': {label: 'Show panel when hovering the icon', defaultOn: false},
+  'bookmark-prices': {label: 'Show the lowest price and listing count on bookmarks', defaultOn: true},
   'auto-backup': {label: 'Back up bookmarks automatically (Downloads/Better Trading 2)', defaultOn: true},
   'equivalent-pricings': {label: 'Equivalent prices (from poe.ninja)', defaultOn: true},
   'regroup-similars': {label: 'Group identical listings from the same seller', defaultOn: true},
   'price-summary': {label: 'Price summary above the results (lowest / median / highest)', defaultOn: false},
   'mod-buttons': {label: 'Plus / Minus buttons on result mods', defaultOn: true},
+  'live-alert-sound': {label: 'Play a sound when a live search finds new items', defaultOn: true},
+  'live-alert-notification': {label: 'Desktop notification when a live search finds new items (while the tab is in the background)', defaultOn: false},
   // Which tabs the panel shows (Settings always shows).
   'tab-bookmarks': {label: 'Bookmarks', defaultOn: true},
   'tab-pinned-items': {label: 'Pinned items', defaultOn: false},
@@ -28,7 +31,8 @@ export const SETTINGS = {
 export const SETTINGS_SECTIONS = [
   {title: 'Search form', keys: ['fuzzy-search', 'tier-search', 'collapsible-stat-groups', 'default-non-unique', 'sticky-search']},
   {title: 'Results', keys: ['highlight-stat-filters', 'mod-buttons', 'equivalent-pricings', 'price-summary', 'regroup-similars']},
-  {title: 'Panel', keys: ['hover-open', 'auto-backup']},
+  {title: 'Live search', keys: ['live-alert-sound', 'live-alert-notification']},
+  {title: 'Panel', keys: ['hover-open', 'bookmark-prices', 'auto-backup']},
   {title: 'Tabs', keys: ['tab-bookmarks', 'tab-pinned-items', 'tab-bulk', 'tab-history']},
 ] as const;
 

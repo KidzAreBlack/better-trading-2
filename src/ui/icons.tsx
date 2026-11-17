@@ -3,7 +3,7 @@ import {faGithub} from '@fortawesome/free-brands-svg-icons';
 import {
   faAngleLeft, faAngleRight, faArchive, faCheck, faCheckCircle, faChevronDown, faClipboard, faCog, faCompressAlt,
   faEllipsisH, faExclamationCircle, faFileExport, faFileImport, faFolderOpen, faFolderPlus, faHistory, faInfoCircle,
-  faPlusSquare, faSave, faSort, faThumbtack, faTimes, faTrashAlt, faUndo, faUserPlus, faUsers,
+  faPlay, faPlusSquare, faSave, faSort, faThumbtack, faTimes, faTrashAlt, faUndo, faUserPlus, faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 
 const ICONS = {
@@ -11,7 +11,7 @@ const ICONS = {
   'check-circle': faCheckCircle, 'chevron-down': faChevronDown, clipboard: faClipboard, cog: faCog,
   'compress-alt': faCompressAlt, 'ellipsis-h': faEllipsisH, 'exclamation-circle': faExclamationCircle,
   'file-export': faFileExport, 'file-import': faFileImport, 'folder-open': faFolderOpen, 'folder-plus': faFolderPlus,
-  github: faGithub, history: faHistory, 'info-circle': faInfoCircle, 'plus-square': faPlusSquare, save: faSave,
+  github: faGithub, history: faHistory, 'info-circle': faInfoCircle, play: faPlay, 'plus-square': faPlusSquare, save: faSave,
   sort: faSort, thumbtack: faThumbtack, times: faTimes, 'trash-alt': faTrashAlt, undo: faUndo, 'user-plus': faUserPlus, users: faUsers,
 };
 

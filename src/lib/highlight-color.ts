@@ -3,7 +3,7 @@ import {local} from './ext';
 // Colour used to highlight the mods you are looking for in the results.
 // Picked in the Settings tab; green unless changed.
 
-export const DEFAULT_HIGHLIGHT_COLOR = '#33aa44';
+const DEFAULT_HIGHLIGHT_COLOR = '#33aa44';
 const STORAGE_KEY = 'highlight-color';
 const OPACITY = 0.35;
 

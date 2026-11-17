@@ -37,14 +37,14 @@ const transform = async (bytes: Uint8Array, stream: CompressionStream | Decompre
 const POBB_LINK = /pobb\.in\/(?:u\/[^/\s]+\/)?([A-Za-z0-9_-]{6,})/;
 
 // A pasted PoB code, or a pobb.in link (fetched by the background script).
-export const readBuildCode = async (input: string): Promise<string | null> => {
+const readBuildCode = async (input: string): Promise<string | null> => {
   const text = input.trim();
   const link = POBB_LINK.exec(text);
   if (link) return sendMessage<string>({query: 'pobb-in', id: link[1]});
   return /^[A-Za-z0-9_\-+/=\s]{20,}$/.test(text) ? text : null;
 };
 
-export const decodeBuild = async (code: string): Promise<Document | null> => {
+const decodeBuild = async (code: string): Promise<Document | null> => {
   try {
     const xml = new TextDecoder().decode(await transform(decodeBase64Url(code), new DecompressionStream('deflate')));
     const doc = new DOMParser().parseFromString(xml, 'text/xml');
@@ -142,6 +142,37 @@ const loadoutSpec = (doc: Document, setTitle: string): Element | undefined => {
   );
 };
 
+// PoE 1 classes and their ascendancies, by the numbers Path of Building saves on each
+// passive tree (classId, ascendClassId). Same order as the game's passive tree data.
+const ASCENDANCIES: Record<number, [string, string[]]> = {
+  0: ['Scion', ['Ascendant', 'Reliquarian', 'Luminary']],
+  1: ['Marauder', ['Juggernaut', 'Berserker', 'Chieftain']],
+  2: ['Ranger', ['Warden', 'Deadeye', 'Pathfinder']],
+  3: ['Witch', ['Occultist', 'Elementalist', 'Necromancer']],
+  4: ['Duelist', ['Slayer', 'Gladiator', 'Champion']],
+  5: ['Templar', ['Inquisitor', 'Hierophant', 'Guardian']],
+  6: ['Shadow', ['Assassin', 'Trickster', 'Saboteur']],
+};
+
+// The build's ascendancy. Some builds leave it out ("None") and only keep it on the
+// passive tree of each loadout, so it's read from the chosen loadout's tree then.
+const readAscendancy = (build: Element | null, spec: Element | undefined): string => {
+  const named = build?.getAttribute('ascendClassName') || '';
+  if (named && named !== 'None') return named;
+
+  const classId = parseInt(spec?.getAttribute('classId') || '', 10);
+  const ascendClassId = parseInt(spec?.getAttribute('ascendClassId') || '', 10);
+  const entry = ASCENDANCIES[classId];
+  if (!entry || !(ascendClassId >= 1)) return named;
+  // The tree's class must be the build's class, so a PoE 2 build is never read this way.
+  if (build?.getAttribute('className') && build.getAttribute('className') !== entry[0]) return named;
+
+  // Before 3.25 the Ranger's first ascendancy was Raider (Warden took its place).
+  const [major, minor] = (spec?.getAttribute('treeVersion') || '').split('_').map(Number);
+  if (classId === 2 && ascendClassId === 1 && major === 3 && minor < 25) return 'Raider';
+  return entry[1][ascendClassId - 1] || named;
+};
+
 // The build's loadouts, from its item sets ("Leveling", "Endgame"...), and the one the build has selected.
 export const listItemSets = (doc: Document): {sets: ItemSetChoice[]; active: string} => {
   const itemsNode = doc.querySelector('Items');
@@ -153,7 +184,7 @@ export const listItemSets = (doc: Document): {sets: ItemSetChoice[]; active: str
   return {sets, active};
 };
 
-export const readBuild = (doc: Document, setId?: string): Build => {
+const readBuild = (doc: Document, setId?: string): Build => {
   const build = doc.querySelector('Build');
   const itemsNode = doc.querySelector('Items');
   const byId = new Map<string, string>();
@@ -188,7 +219,7 @@ export const readBuild = (doc: Document, setId?: string): Build => {
 
   return {
     className: build?.getAttribute('className') || '',
-    ascendancy: build?.getAttribute('ascendClassName') || '',
+    ascendancy: readAscendancy(build, spec),
     level: build?.getAttribute('level') || '',
     items,
   };
@@ -208,7 +239,7 @@ const pageFetch: typeof fetch = (input, init) => ((globalThis as any).content?.f
 
 const apiBase = (version: TradeSiteVersion) => `https://www.pathofexile.com/api/${version === '2' ? 'trade2' : 'trade'}/data`;
 
-export const loadStatIndex = async (version: TradeSiteVersion): Promise<StatIndex> => {
+const loadStatIndex = async (version: TradeSiteVersion): Promise<StatIndex> => {
   const payload: Json = await (await pageFetch(`${apiBase(version)}/stats`)).json();
   const index: StatIndex = new Map();
   for (const group of payload.result || []) {
@@ -227,7 +258,7 @@ export interface ItemData {
   uniques: Set<string>; // every real unique name
 }
 
-export const loadItemData = async (version: TradeSiteVersion): Promise<ItemData> => {
+const loadItemData = async (version: TradeSiteVersion): Promise<ItemData> => {
   const payload: Json = await (await pageFetch(`${apiBase(version)}/items`)).json();
   const data: ItemData = {bases: new Map(), uniques: new Set()};
   for (const group of payload.result || []) {
@@ -244,10 +275,25 @@ const NUMBER = /\d+(?:\.\d+)?/g;
 interface ModMatch {
   id: string;
   value: number | null;
+  // Other stats the same mod may be listed as; then the search accepts any of them.
+  alternatives?: string[];
 }
 
 // "{crafted}{range:0.5}+42 to maximum Life" -> the stat filter for it, with its value.
+// "Socketed Gems are Supported by Level 20 Multistrike": the trade site lists some of these
+// with " Support" at the end and some without, and a few both ways. Both are tried; when both
+// exist, the search takes either (a Count group).
 const matchMod = (rawLine: string, preferred: string, index: StatIndex, isLocalItem: boolean): ModMatch | null => {
+  const plain = matchModText(rawLine, preferred, index, isLocalItem);
+  if (!/Supported by Level/i.test(rawLine)) return plain;
+
+  const other = / Support\s*$/.test(rawLine) ? rawLine.replace(/ Support\s*$/, '') : `${rawLine.trimEnd()} Support`;
+  const alternative = matchModText(other, preferred, index, isLocalItem);
+  if (!plain || !alternative) return plain || alternative;
+  return plain.id === alternative.id ? plain : {...plain, alternatives: [alternative.id]};
+};
+
+const matchModText = (rawLine: string, preferred: string, index: StatIndex, isLocalItem: boolean): ModMatch | null => {
   const tags = (rawLine.match(/\{[^}]*\}/g) || []).map((tag) => tag.slice(1, -1).split(':')[0]);
   const line = rawLine
     .split('\n')
@@ -328,10 +374,14 @@ export interface BuiltSearch {
   skipped: number;
 }
 
-export const buildSearch = (item: BuildItem, index: StatIndex, data: ItemData, minPercent: number): BuiltSearch | null => {
+const buildSearch = (item: BuildItem, index: StatIndex, data: ItemData, minPercent: number): BuiltSearch | null => {
   const {bases} = data;
   const label = item.slot.replace(/ \d+$/, '').replace(/ Abyssal Socket$/, ' jewel');
-  const isRealUnique = item.rarity === 'UNIQUE' && data.uniques.has(item.name);
+  // Foulborn uniques are real, but the trade site lists them under the plain unique's
+  // name ("Mageblood", not "Foulborn Mageblood"). Their changed ({mutated}) mods are
+  // among the mods searched, which tells them apart from the plain version.
+  const uniqueName = item.name.replace(/^Foulborn\s+/i, '');
+  const isRealUnique = item.rarity === 'UNIQUE' && data.uniques.has(uniqueName);
 
 
   const base = item.rarity === 'MAGIC' ? findBase(item.name, bases) : item.base;
@@ -341,6 +391,8 @@ export const buildSearch = (item: BuildItem, index: StatIndex, data: ItemData, m
   const isLocalItem = group === 'weapon' || group === 'armour';
 
   const filters: Json[] = [];
+  // Mods the trade site lists more than one way: each its own "Count: at least 1" group.
+  const eitherGroups: Json[] = [];
   let skipped = 0;
   // `unticked`: added to the search but switched off (its box unticked), to tick if wanted.
   const add = (lines: string[], preferred: string, unticked = false) => {
@@ -367,6 +419,7 @@ export const buildSearch = (item: BuildItem, index: StatIndex, data: ItemData, m
         continue;
       }
       if (filters.some((filter) => filter.id === match!.id)) continue;
+      if (eitherGroups.some((group) => group.filters.some((filter: Json) => filter.id === match!.id))) continue;
       // Uniques: just "has this mod", no values, so any roll of that version matches.
       // Others: small counts (+1 gem level, 2 extra arrows) stay exact; other values use the chosen %.
       const min =
@@ -376,6 +429,13 @@ export const buildSearch = (item: BuildItem, index: StatIndex, data: ItemData, m
             ? Math.floor(match.value)
             : Math.floor((match.value * minPercent) / 100);
       const filter: Json = min !== undefined && min > 0 ? {id: match.id, value: {min}} : {id: match.id};
+      if (match.alternatives?.length) {
+        const either = [filter, ...match.alternatives.map((id) => (filter.value ? {id, value: filter.value} : {id}))];
+        const group: Json = {type: 'count', value: {min: 1}, filters: either};
+        if (unticked) group.disabled = true;
+        eitherGroups.push(group);
+        continue;
+      }
       if (unticked) filter.disabled = true;
       filters.push(filter);
     }
@@ -392,9 +452,9 @@ export const buildSearch = (item: BuildItem, index: StatIndex, data: ItemData, m
     // they're left out; implicits and enchantments are added unticked.
     add(item.explicits.filter((line) => !/\{(crafted|enchant)\}/.test(line)), 'explicit');
     add(extras, 'implicit', true);
-    const query: Json = {name: item.name, type: item.base};
-    if (filters.length) query.stats = [{type: 'and', filters}];
-    return {title: `${label}: ${item.name}`, query, matched: filters.length, skipped};
+    const query: Json = {name: uniqueName, type: item.base};
+    if (filters.length || eitherGroups.length) query.stats = [{type: 'and', filters}, ...eitherGroups];
+    return {title: `${label}: ${item.name}`, query, matched: filters.length + eitherGroups.length, skipped};
   }
 
   add(item.explicits.filter((line) => !isEnchant(line)), 'explicit');
@@ -402,28 +462,31 @@ export const buildSearch = (item: BuildItem, index: StatIndex, data: ItemData, m
 
   // A placeholder unique ("any unique with these mods") is searched without the rarity limit.
   const typeFilters: Json = item.rarity === 'UNIQUE' ? {} : {rarity: {option: 'nonunique'}};
-  const query: Json = {stats: [{type: 'and', filters}], filters: {type_filters: {filters: typeFilters}}};
-  // Armour and jewellery: search the whole category (any base) so more items show up.
-  // Weapons, shields, quivers, jewels and flasks: keep the exact base type.
-  if (category) typeFilters.category = {option: category};
-  else if (isRealBase) query.type = base;
+  const query: Json = {stats: [{type: 'and', filters}, ...eitherGroups], filters: {type_filters: {filters: typeFilters}}};
+  // The item's exact base type when the trade site knows it; otherwise its whole category.
+  if (isRealBase) query.type = base;
+  else if (category) typeFilters.category = {option: category};
 
-  if (!filters.length && !query.type && !category) return null;
+  if (!filters.length && !eitherGroups.length && !query.type && !category) return null;
 
-  const shownBase = isRealBase ? base : `${item.base || 'unknown base'}, any base`;
+  const shownBase = isRealBase ? (base as string) : `${item.base || 'unknown base'}, any base`;
+  // "New Item" is Path of Building's name for items made in it: show the base type instead.
+  const hasOwnName = Boolean(item.name) && !/^new item$/i.test(item.name.trim());
   const name =
     item.rarity === 'UNIQUE'
       ? `${item.name} (not a real unique, searched by mods)`
       : item.rarity === 'RARE'
-        ? `${item.name} (${shownBase})`
+        ? hasOwnName
+          ? `${item.name} (${shownBase})`
+          : shownBase
         : isRealBase
           ? (base as string)
           : item.name;
-  return {title: `${label}: ${name}`, query, matched: filters.length, skipped};
+  return {title: `${label}: ${name}`, query, matched: filters.length + eitherGroups.length, skipped};
 };
 
 // The trade site's link format: gzip of the search JSON, in base64url.
-export const searchSlug = async (query: Json): Promise<string> =>
+const searchSlug = async (query: Json): Promise<string> =>
   encodeBase64Url(await transform(new TextEncoder().encode(JSON.stringify(query)), new CompressionStream('gzip')));
 
 const folderIcon = (version: TradeSiteVersion, ascendancy: string): string | null => {

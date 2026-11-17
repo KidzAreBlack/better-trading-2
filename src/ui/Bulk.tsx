@@ -1,10 +1,15 @@
-// Bulk: sellers with more than one listing in the current search results, most first.
+// Bulk: sellers with more than one listing in the current search results, sorted by number
+// of listings or by what all their listings cost together.
 // Each seller is a card (click its heading to fold it) listing their prices, with
 // Find (scroll to the listing) and Buy (the listing's own "Travel to Hideout" /
 // "Direct Whisper" button on the trade site).
 
 import {useEffect, useState} from 'preact/hooks';
-import {sleep} from '../lib/util';
+import {local} from '../lib/ext';
+import {fetchChaosRatios} from '../lib/poe-ninja';
+import type {ChaosRatios} from '../lib/poe-ninja';
+import {currentLocation} from '../lib/trade-location';
+import {sleep, slugify} from '../lib/util';
 import {AlertMessage, flash} from './common';
 
 interface Listing {
@@ -18,6 +23,59 @@ interface Seller {
   account: string;
   listings: Listing[];
 }
+
+// What a seller's listings cost together, per currency.
+interface Total {
+  currencyName: string;
+  currencyImage: string | null;
+  amount: number;
+}
+
+type SortOrder = 'listings' | 'lowest' | 'highest';
+const SORT_KEY = 'bulk-sort';
+const SORT_LABELS: Record<SortOrder, string> = {listings: 'Most listings', lowest: 'Lowest total price', highest: 'Highest total price'};
+
+const totalsOf = (seller: Seller): Total[] => {
+  const byCurrency = new Map<string, Total>();
+  for (const listing of seller.listings) {
+    const amount = parseFloat(listing.price);
+    if (!Number.isFinite(amount)) continue;
+    const total = byCurrency.get(listing.currencyName) || {currencyName: listing.currencyName, currencyImage: listing.currencyImage, amount: 0};
+    total.amount += amount;
+    byCurrency.set(listing.currencyName, total);
+  }
+  return [...byCurrency.values()].sort((a, b) => b.amount - a.amount);
+};
+
+// The whole total in Chaos Orbs (poe.ninja rates), or null when a currency's value isn't known.
+const chaosValue = (totals: Total[], ratios: ChaosRatios | null): number | null => {
+  if (!totals.length) return null;
+  let sum = 0;
+  for (const total of totals) {
+    const slug = slugify(total.currencyName);
+    const rate = slug === 'chaos-orb' ? 1 : ratios?.[slug];
+    if (!rate) return null;
+    sum += total.amount * rate;
+  }
+  return sum;
+};
+
+const formatAmount = (amount: number) => String(Math.round(amount * 100) / 100);
+
+// Chaos rates for the Bulk totals (PoE 1 only), fetched once while the tab is open.
+const useRatios = () => {
+  const [ratios, setRatios] = useState<ChaosRatios | null>(null);
+  useEffect(() => {
+    const {version, league} = currentLocation();
+    if (version !== '1' || !league) return undefined;
+    let isActive = true;
+    void fetchChaosRatios(league).then((result) => isActive && setRatios(result));
+    return () => {
+      isActive = false;
+    };
+  }, []);
+  return ratios;
+};
 
 const RESULT_ROWS = '.resultset > div.row[data-id]';
 const BUY_BUTTON = '.details .btns .direct-btn';
@@ -123,7 +181,16 @@ const buyButton = (id: string) => rowById(id)?.querySelector<HTMLButtonElement>(
 
 export function Bulk() {
   const {listings, sellers} = useSellers();
+  const ratios = useRatios();
   const [folded, setFolded] = useState<Set<string>>(new Set());
+  const [sort, setSortState] = useState<SortOrder>(() => {
+    const stored = local.get(SORT_KEY) as SortOrder | null;
+    return stored && stored in SORT_LABELS ? stored : 'listings';
+  });
+  const setSort = (order: SortOrder) => {
+    local.set(SORT_KEY, order);
+    setSortState(order);
+  };
 
   useEffect(() => () => document.querySelectorAll(`.${FOUND_CLASS}`).forEach((row) => row.classList.remove(FOUND_CLASS)), []);
 
@@ -132,7 +199,19 @@ export function Bulk() {
   }
 
   // Sellers with a single listing are left out.
-  const repeatSellers = sellers.filter((seller) => seller.listings.length > 1);
+  const repeatSellers = sellers
+    .filter((seller) => seller.listings.length > 1)
+    .map((seller) => {
+      const totals = totalsOf(seller);
+      return {seller, totals, chaos: chaosValue(totals, ratios)};
+    });
+  if (sort !== 'listings') {
+    // Sellers whose total can't be worked out go last.
+    const direction = sort === 'lowest' ? 1 : -1;
+    repeatSellers.sort((a, b) =>
+      a.chaos === null || b.chaos === null ? (a.chaos === null ? 1 : 0) - (b.chaos === null ? 1 : 0) : (a.chaos - b.chaos) * direction
+    );
+  }
   const toggle = (account: string) => {
     const next = new Set(folded);
     if (next.has(account)) next.delete(account);
@@ -146,9 +225,22 @@ export function Bulk() {
         {listings} listings from {sellers.length} sellers, {repeatSellers.length} with more than one
       </div>
 
+      {repeatSellers.length > 1 && (
+        <label class="bt-bulk-sort">
+          Sort by
+          <select class="bt-form-input bt-bulk-sort-select" value={sort} onChange={(event) => setSort((event.target as HTMLSelectElement).value as SortOrder)}>
+            {(Object.keys(SORT_LABELS) as SortOrder[]).map((order) => (
+              <option key={order} value={order}>
+                {SORT_LABELS[order]}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       {repeatSellers.length === 0 && <AlertMessage type="warning" message="No seller has more than one listing in the loaded results." />}
 
-      {repeatSellers.map((seller) => {
+      {repeatSellers.map(({seller, totals, chaos}) => {
         const isFolded = folded.has(seller.account);
         return (
           <div key={seller.account} class={`bt-bulk-seller ${isFolded ? 'is-folded' : ''}`}>
@@ -157,6 +249,24 @@ export function Bulk() {
               <span class="bt-bulk-seller-name">{seller.account}</span>
               <span class="bt-bulk-seller-count">{seller.listings.length}</span>
             </div>
+            {totals.length > 0 && (
+              <div class="bt-bulk-seller-total">
+                <span class="bt-bulk-listing-label">Total:</span>
+                {totals.map((total, index) => (
+                  <span key={total.currencyName} class="bt-bulk-seller-total-part">
+                    {index > 0 && <span class="bt-bulk-seller-total-plus">+</span>}
+                    <span class="bt-bulk-listing-value">{formatAmount(total.amount)}</span>
+                    {total.currencyImage ? (
+                      <img class="bt-bulk-listing-currency" src={total.currencyImage} alt={total.currencyName} title={total.currencyName} />
+                    ) : (
+                      <span> {total.currencyName}</span>
+                    )}
+                  </span>
+                ))}
+                {/* Mixed currencies: what it all comes to in Chaos. */}
+                {totals.length > 1 && chaos !== null && <span class="bt-bulk-seller-total-chaos">(≈ {Math.round(chaos)} chaos)</span>}
+              </div>
+            )}
 
             {!isFolded &&
               seller.listings.map((listing) => {

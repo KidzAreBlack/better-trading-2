@@ -10,10 +10,11 @@ It does not collect, sell or share any personal data.
 Everything stays in your own browser, on your own computer:
 
 - **Bookmarks** (folder names, search titles and trade-site search links), **search history** and a
-  short-lived cache of poe.ninja prices, kept in the browser's extension storage (`storage.local`).
+  short-lived cache of poe.ninja prices, the lowest price and listing count last seen for each bookmark, kept in the browser's extension storage (`storage.local`).
 - **Pinned items** exist only in memory while the trade page is open; they are not saved.
-- **Settings** (the on/off options, highlight colour, panel state), kept in the trade site's local
-  storage under keys starting with `bt-`.
+- **Settings** (the on/off options, highlight colour, panel state, alert sound and volume), kept in the
+  trade site's local storage under keys starting with `bt-`.
+- **Your own alert sounds**, if you add any, kept in extension storage.
 
 None of this is sent to the developer or to anyone else. It is removed when you uninstall the
 extension (extension storage) or clear the site's data in your browser (settings).
@@ -40,6 +41,8 @@ There is no analytics, tracking, advertising or remote code.
 - `storage`: keeps your bookmarks, history and the price cache.
 - `downloads`: saves the automatic bookmark backup to `Downloads/Better Trading 2/backup.txt` on your
   computer (a setting, on by default). Nothing is uploaded anywhere.
+- `notifications`: shows a desktop notification when a live search finds new items, only if you turn
+  that setting on (off by default).
 - Access to `www.pathofexile.com/trade*`: shows the sidebar and search tools on the trade site.
 - Access to `poe.ninja`: downloads public price data for equivalent prices.
 - Access to `pobb.in`: downloads a shared build when you paste a pobb.in link into **Add build**.

@@ -35,11 +35,36 @@ const saveBackup = async (text: string): Promise<boolean> => {
   }
 };
 
+// Clicking a live search notification brings its trade tab to the front.
+const notificationTabs = new Map<string, {tabId: number; windowId?: number}>();
+api.notifications?.onClicked?.addListener((id: string) => {
+  const target = notificationTabs.get(id);
+  if (!target) return;
+  void api.tabs?.update(target.tabId, {active: true});
+  if (target.windowId !== undefined) void api.windows?.update(target.windowId, {focused: true});
+  void api.notifications.clear(id);
+});
+api.notifications?.onClosed?.addListener((id: string) => notificationTabs.delete(id));
+
 api.runtime.onMessage.addListener(
   (request: {query?: string; resource?: string; id?: string; text?: string}, _sender: unknown, sendResponse: (payload: unknown) => void) => {
     if (request.query === 'backup-file') {
       if (typeof request.text !== 'string') return undefined;
       saveBackup(request.text).then(sendResponse, () => sendResponse(false));
+      return true;
+    }
+
+    // Live search alert, when the trade tab is in the background.
+    if (request.query === 'notify') {
+      const {title, message} = request as {title?: unknown; message?: unknown};
+      if (typeof title !== 'string' || typeof message !== 'string' || !api.notifications?.create) return undefined;
+      api.notifications
+        .create({type: 'basic', iconUrl: api.runtime.getURL('assets/icon128.png'), title: title.slice(0, 100), message: message.slice(0, 200)})
+        .then((id: string) => {
+          const tab = (_sender as {tab?: {id?: number; windowId?: number}}).tab;
+          if (tab?.id !== undefined) notificationTabs.set(id, {tabId: tab.id, windowId: tab.windowId});
+          sendResponse(true);
+        }, () => sendResponse(false));
       return true;
     }
 

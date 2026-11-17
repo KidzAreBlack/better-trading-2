@@ -14,7 +14,7 @@ const inputValue = (selector: string, emptyValue?: string): string | null => {
 };
 
 export const getCategory = (): string | null => inputValue(CATEGORY_INPUT, 'Any');
-export const getRarity = (): string | null => inputValue(RARITY_INPUT, 'Any');
+const getRarity = (): string | null => inputValue(RARITY_INPUT, 'Any');
 export const getName = (): string | null => inputValue(SEARCH_INPUT);
 
 export const recommendTitle = (): string => {

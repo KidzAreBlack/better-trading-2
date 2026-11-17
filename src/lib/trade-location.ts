@@ -14,7 +14,7 @@ const BASE_URL = 'https://www.pathofexile.com';
 const REALMS = ['xbox', 'sony', 'poe2'];
 const POLLING_INTERVAL_MS = 500;
 
-export const parseTradePath = (pathname: string): TradeLocation => {
+const parseTradePath = (pathname: string): TradeLocation => {
   const parts = pathname.split('/').slice(1);
   let versionPart, type, league, slug, live;
 

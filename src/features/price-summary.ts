@@ -33,7 +33,7 @@ const showChaos = (chaos: number) => {
   return divine && chaos >= divine ? `${round(chaos / divine)} div` : `${round(chaos)} c`;
 };
 
-export const summaryText = (rows: Element[], rates: ChaosRatios | null): string | null => {
+const summaryText = (rows: Element[], rates: ChaosRatios | null): string | null => {
   const prices: Price[] = [];
   let currency: string | null = null;
   let sameCurrency = true;

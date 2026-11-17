@@ -27,7 +27,7 @@ export const clearHistory = async (): Promise<void> => {
   emit('history-change');
 };
 
-export const logLocation = async (location: TradeLocation): Promise<void> => {
+const logLocation = async (location: TradeLocation): Promise<void> => {
   const {version, type, league, slug} = location;
   if (!type || !league || !slug) return;
 

@@ -36,7 +36,7 @@ const fingerprint = (text: string) => {
   return `${text.length}:${hash}`;
 };
 
-export const backUpNow = async (): Promise<boolean> => {
+const backUpNow = async (): Promise<boolean> => {
   const text = await generateBackup();
   const print = fingerprint(text);
   if (local.get(LAST_KEY) === print) return true;

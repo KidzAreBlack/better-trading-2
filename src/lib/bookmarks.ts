@@ -15,6 +15,8 @@ export interface BookmarkTrade {
   title: string;
   location: BookmarkLocation;
   completedAt: string | null;
+  // Live search alert sound for this search (unset: the default from Settings).
+  sound?: string;
 }
 
 export interface BookmarkFolder {
@@ -28,6 +30,15 @@ export interface BookmarkFolder {
 const FOLDERS_KEY = 'bookmark-folders';
 const TRADES_KEY = 'bookmark-trades';
 const EXPANSION_KEY = 'bookmark-folders-expansion';
+const BUILD_KEY = 'bookmark-build';
+
+// Where a folder made by "Add build" came from, so it can be imported again later.
+export interface BuildSource {
+  input: string; // the pasted pobb.in link or Path of Building code
+  setTitle?: string;
+  minPercent: number;
+  title: string; // the folder title Add build gave it
+}
 
 // Icons offered for folders: currency/item icons, and ascendancies grouped by class.
 // Ascendancy portraits are the PoE wikis' avatar images (Grinding Gear Games art). Raider (replaced by
@@ -117,8 +128,13 @@ export const saveTrade = async (trade: BookmarkTrade, folderId: string): Promise
   await saveTrades(updated, folderId);
 };
 
+export const fetchBuildSource = (folderId: string): Promise<BuildSource | null> => storage.get<BuildSource>(`${BUILD_KEY}--${folderId}`);
+
+export const saveBuildSource = (folderId: string, source: BuildSource): Promise<void> => storage.set(`${BUILD_KEY}--${folderId}`, source);
+
 export const deleteFolder = async (folderId: string): Promise<void> => {
   await storage.remove(`${TRADES_KEY}--${folderId}`);
+  await storage.remove(`${BUILD_KEY}--${folderId}`);
   await saveFolders((await fetchFolders()).filter((folder) => folder.id !== folderId));
 };
 
@@ -168,7 +184,7 @@ interface ExportedFolder {
   icn: string | null;
   tit: string;
   ver?: TradeSiteVersion;
-  trs: {tit: string; loc: string}[];
+  trs: {tit: string; loc: string; snd?: string}[];
 }
 
 export const serializeFolder = (folder: BookmarkFolder, trades: BookmarkTrade[]): string => {
@@ -179,6 +195,7 @@ export const serializeFolder = (folder: BookmarkFolder, trades: BookmarkTrade[])
     trs: trades.map((trade) => ({
       tit: trade.title,
       loc: `${trade.location.version}:${trade.location.type}:${trade.location.slug}`,
+      ...(trade.sound ? {snd: trade.sound} : {}),
     })),
   };
 
@@ -202,7 +219,9 @@ export const deserializeFolder = (serialized: string): [BookmarkFolder, Bookmark
       const parts = trade.loc.split(':');
       const [version, type, slug] = exportVersion >= 3 ? parts : ['1', ...parts];
 
-      return {title: trade.tit, completedAt: null, location: {version: version as TradeSiteVersion, type, slug}};
+      const restored: BookmarkTrade = {title: trade.tit, completedAt: null, location: {version: version as TradeSiteVersion, type, slug}};
+      if (typeof trade.snd === 'string') restored.sound = trade.snd;
+      return restored;
     });
 
     if (typeof folder.title !== 'string') return null;

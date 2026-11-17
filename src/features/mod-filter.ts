@@ -65,7 +65,7 @@ let scheduled = false;
 let lastFirstId: string | null | undefined;
 let sawNoResults = false;
 
-export const parseQuery = (query: string): Term[] =>
+const parseQuery = (query: string): Term[] =>
   query
     .toLowerCase()
     .split(',')
@@ -92,10 +92,10 @@ export const parseQuery = (query: string): Term[] =>
 
 // ---- Regex mode -----------------------------------------------------------------------
 
-export const isRegexQuery = (query: string): boolean => /["!|\\[\]()*?^${}]/.test(query);
+const isRegexQuery = (query: string): boolean => /["!|\\[\]()*?^${}]/.test(query);
 
 // Splits like the game: by spaces, except inside quotes; "!" before or inside the quotes negates.
-export const parseRegexQuery = (query: string): RegexTerm[] =>
+const parseRegexQuery = (query: string): RegexTerm[] =>
   (query.match(/!?"[^"]*"?|[^\s"]+/g) || [])
     .map((token) => {
       let text = token;

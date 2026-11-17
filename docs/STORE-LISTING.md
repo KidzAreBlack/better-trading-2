@@ -18,7 +18,8 @@ Features:
   files. Backups from the original Better Trading import as-is.
 • Add build: paste a Path of Building code or pobb.in link to get a folder with a trade search for every
   item the build wears.
-• Bulk: see which sellers have more than one listing in the current search.
+• Bulk: see which sellers have more than one listing in the current search, with their total price.
+• Live search alerts: a sound (built-in or your own) and an optional desktop notification for new items.
 • Price summary: lowest, median and highest price of the loaded results.
 • History of the searches you run, and pinned items for comparing results (optional tab).
 • Equivalent prices from poe.ninja (PoE 1), highlighting of the mods you searched for and
@@ -54,6 +55,8 @@ Path of Exile trade website.
 - `downloads`: keeps an automatic backup of the user's bookmarks as one file on their own computer
   (Downloads/Better Trading 2/backup.txt, overwritten when bookmarks change), so a browser reset
   doesn't lose them. It can be turned off in Settings. Nothing is uploaded.
+- `notifications`: when the user turns on the live search alert setting (off by default), shows a
+  desktop notification when a live search on the trade site finds new items.
 - Host permission `https://poe.ninja/*`: downloads public currency prices from poe.ninja to show
   "equivalent prices" on trade results. Only the league name is sent.
 - Host permission `https://pobb.in/*`: when the user pastes a pobb.in link into "Add build", downloads

@@ -14,9 +14,9 @@ const transform = async (bytes: Uint8Array, stream: CompressionStream | Decompre
   new Uint8Array(await new Response(new Blob([bytes as BlobPart]).stream().pipeThrough(stream)).arrayBuffer());
 
 // Only links that carry their search can be read; old short search ids cannot.
-export const isSelfContained = (slug: string): boolean => slug.startsWith('H4sI');
+const isSelfContained = (slug: string): boolean => slug.startsWith('H4sI');
 
-export const decodeSearch = async (slug: string): Promise<Json | null> => {
+const decodeSearch = async (slug: string): Promise<Json | null> => {
   if (!isSelfContained(slug)) return null;
   try {
     const binary = atob(slug.replace(/-/g, '+').replace(/_/g, '/'));
@@ -28,7 +28,7 @@ export const decodeSearch = async (slug: string): Promise<Json | null> => {
   }
 };
 
-export const encodeSearch = async (query: Json): Promise<string> => {
+const encodeSearch = async (query: Json): Promise<string> => {
   const bytes = await transform(new TextEncoder().encode(JSON.stringify(query)), new CompressionStream('gzip'));
   let binary = '';
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
@@ -52,11 +52,22 @@ export const withTradeMode = async (slug: string, mode: string | null): Promise<
 };
 
 // Identifies a search regardless of its trade mode, for "is this the same search?" checks.
-export const searchKey = async (slug: string): Promise<string> => {
-  const query = await decodeSearch(slug);
-  if (!query) return slug;
-  const {status: _status, ...rest} = query;
-  return JSON.stringify(rest);
+// Several features ask this for every bookmark on each page change, so answers are kept.
+const keys = new Map<string, Promise<string>>();
+const MAX_KEYS = 2000;
+
+export const searchKey = (slug: string): Promise<string> => {
+  let key = keys.get(slug);
+  if (!key) {
+    if (keys.size >= MAX_KEYS) keys.clear();
+    key = decodeSearch(slug).then((query) => {
+      if (!query) return slug;
+      const {status: _status, ...rest} = query;
+      return JSON.stringify(rest);
+    });
+    keys.set(slug, key);
+  }
+  return key;
 };
 
 // ---- The mode you are using ---------------------------------------------------------
