@@ -111,7 +111,8 @@ test('settings are off by default and turn features on', async () => {
   await sleep(50);
   assert.equal(window.localStorage.getItem('bt-settings-folded'), null);
   assert.deepEqual([...document.querySelectorAll('.bt-settings .bt-form-checkbox')].map((b) => b.textContent.trim()), [
-    'Add fuzzy key to search', 'Tier search', 'Stat filters are collapsible', 'Item rarity starts on Any Non-Unique',
+    'Add fuzzy key to search',
+    'Quick filter presets', 'Tier search', 'Stat filters are collapsible', 'Item rarity starts on Any Non-Unique',
     'Keep the search bar on screen while scrolling',
     'Highlight searched mods', 'Plus / Minus buttons on result mods', 'Equivalent prices (from poe.ninja)',
     'Price summary above the results (lowest / median / highest)',
@@ -165,6 +166,18 @@ test('settings are off by default and turn features on', async () => {
   assert.equal(search.value, 'r text');
   type(search, 'bel');
   assert.equal(document.querySelectorAll('.bt-tier-button').length, 1, 'only the explicit stat gets a tier button');
+
+  // Closed by clicking elsewhere, one click on T opens it again (not two).
+  const tierButton = document.querySelector('.bt-tier-button');
+  click(tierButton);
+  assert.ok(document.getElementById('bt-tier-popup'));
+  document.querySelector('.resultset').dispatchEvent(new window.MouseEvent('mousedown', {bubbles: true}));
+  assert.equal(document.getElementById('bt-tier-popup'), null, 'closed by the outside click');
+  assert.ok(!tierButton.classList.contains('is-open'));
+  click(tierButton);
+  assert.ok(document.getElementById('bt-tier-popup'), 'opens on the first click');
+  click(tierButton); // a second click on T closes it, as before
+  assert.equal(document.getElementById('bt-tier-popup'), null);
 
   // Without Advanced filtering: no filter box, and picking a tier only fills the min box.
   assert.equal(document.querySelector('.bt-mod-filter'), null);
@@ -1504,7 +1517,7 @@ test('Re-import build: a build folder can be made again from its source, keeping
 
 test('Live search: new items above the shown ones play the sound once per batch, and notify in the background', async () => {
   const messages = [];
-  const {document, window} = await load({path: '/trade/search/Standard/abc123/live', settings: ['live-alert-notification'], onMessage: (m) => (messages.push(m), true)});
+  const {document, window} = await load({path: '/trade/search/Standard/abc123/live', settings: ['live-alert-notification'], local: {'bt-live-alert-sound-choice': 'chime'}, onMessage: (m) => (messages.push(m), true)});
   // A stand-in for the browser's audio: counts the sounds started.
   let played = 0;
   class FakeAudio {
@@ -1602,7 +1615,7 @@ test('Live search: a bookmarked search plays the sound picked on its bookmark', 
   click([...document.querySelectorAll('.bt-contextual-menu-item')].find((item) => item.textContent.trim() === 'Edit'));
   await sleep(50);
   const select = document.querySelector('.bt-trade-sound');
-  assert.deepEqual([...select.options].map((o) => o.textContent), ['Default (from Settings)', 'Chime', 'Ding', 'Beep', 'No sound']);
+  assert.deepEqual([...select.options].map((o) => o.textContent), ['Default (from Settings)', 'Trade site’s sound', 'Chime', 'Ding', 'Beep', 'No sound']);
   assert.equal(select.value, 'ding');
   select.value = 'beep';
   select.dispatchEvent(new window.Event('change', {bubbles: true}));
@@ -1726,4 +1739,308 @@ test('tab title: a search name with spaces at the end does not freeze the page',
   await sleep(1500);
   assert.ok(writes < 5, `the title was written ${writes} times`);
   assert.match(document.title, /^~Behemoth - /);
+});
+
+test('Quick filters: a Yes / No filter gets ✗ and ✓ buttons, other filters their value; a click puts it into the search form', async () => {
+  const FILTERS = {result: [{id: 'misc_filters', title: 'Miscellaneous', filters: [
+    {id: 'quality', text: 'Quality', minMax: true},
+    {id: 'corrupted', text: 'Corrupted', option: {options: [{id: null, text: 'Any'}, {id: 'true', text: 'Yes'}, {id: 'false', text: 'No'}]}},
+  ]}]};
+  const {window, document, store} = await load({onFetch: async (url) => (/\/api\/trade\/data\/filters$/.test(url) ? {ok: true, json: async () => FILTERS} : null)});
+  window.app = {state: {filters: {misc_filters: {disabled: true, filters: {}}}, stats: []}};
+  window.eval(readFileSync(new URL('../dist/chrome/page.js', import.meta.url), 'utf8'));
+  await sleep(100);
+
+  const bar = document.querySelector('.search-advanced-pane.brown > #bt-quick-filters');
+  assert.ok(bar, 'the bar sits at the top of the stat filters side');
+  assert.match(bar.textContent, /Quick filter presets/);
+  const add = bar.querySelector('.bt-quick-filters-header .bt-quick-filter-add');
+  assert.ok(add, 'the Add button sits in the header, at the top');
+  assert.equal(add.textContent.trim(), '', 'the Add button is just its icon');
+  assert.equal(add.title, 'Add a quick filter');
+
+  const pickFilter = async (value) => {
+    click(bar.querySelector('.bt-quick-filter-add'));
+    await sleep(100);
+    const pick = bar.querySelector('.bt-quick-filter-pick');
+    pick.value = value;
+    pick.dispatchEvent(new window.Event('change', {bubbles: true}));
+    await sleep(30);
+    return pick;
+  };
+  const submit = async () => {
+    bar.querySelector('.bt-quick-filter-form').dispatchEvent(new window.Event('submit', {bubbles: true, cancelable: true}));
+    await sleep(100);
+  };
+
+  // Corrupted: only Yes or No, so no value to pick.
+  const pick = await pickFilter('misc_filters.corrupted');
+  assert.deepEqual([...pick.querySelectorAll('option')].map((o) => o.textContent), ['Pick a filter…', 'Quality', 'Corrupted']);
+  assert.equal(bar.querySelectorAll('.bt-quick-filter-form select').length, 1);
+  await submit();
+  // Quality 20+.
+  await pickFilter('misc_filters.quality');
+  type(bar.querySelector('.bt-quick-filter-number'), '20');
+  await sleep(30);
+  await submit();
+  assert.deepEqual(store['quick-filters'].value.map((f) => [f.label, f.filter, f.value, f.valueText, Boolean(f.yesNo)]), [
+    ['Corrupted', 'corrupted', {}, 'Yes / No', true],
+    ['Quality', 'quality', {min: 20}, '20+', false],
+  ]);
+
+  const corrupted = () => bar.querySelectorAll('.bt-quick-filter')[0];
+  const choice = (kind) => corrupted().querySelector(`.bt-quick-filter-choice.is-${kind}`);
+  assert.equal(choice('no').textContent, '✗');
+  assert.equal(choice('yes').textContent, '✓');
+  const misc = () => JSON.parse(JSON.stringify(window.app.state.filters.misc_filters));
+
+  click(choice('no'));
+  await sleep(100);
+  assert.deepEqual(misc(), {disabled: false, filters: {corrupted: {option: 'false'}}}, 'set to No, and the unticked Miscellaneous box is ticked');
+  click(choice('no')); // just applies again; nothing is tracked or cleared
+  await sleep(100);
+  assert.deepEqual(misc().filters.corrupted, {option: 'false'});
+  click(choice('yes'));
+  await sleep(100);
+  assert.deepEqual(misc().filters.corrupted, {option: 'true'});
+  assert.equal(bar.querySelectorAll('.is-on, .is-active').length, 0, 'no lit state');
+
+  // The number filter: + sets it, − clears it.
+  const quality = bar.querySelectorAll('.bt-quick-filter')[1];
+  assert.equal(quality.querySelector('.bt-quick-filter-value').textContent, '20+');
+  const [qualityMinus, qualityPlus] = quality.querySelectorAll('.bt-quick-filter-choice');
+  assert.deepEqual([qualityMinus.textContent.trim(), qualityPlus.textContent.trim()], ['−', '+']);
+  click(qualityPlus);
+  await sleep(100);
+  assert.deepEqual(misc().filters.quality, {min: 20});
+  click(qualityMinus);
+  await sleep(100);
+  assert.equal(misc().filters.quality, undefined);
+  assert.deepEqual(misc().filters.corrupted, {option: 'true'}, 'other filters stay');
+
+  // The pencil and × only show in edit mode, and presets only move then.
+  assert.equal(bar.querySelector('.bt-quick-filter-choice.is-edit, .bt-quick-filter-choice.is-delete'), null);
+  assert.ok([...bar.querySelectorAll('.bt-quick-filter')].every((chip) => chip.getAttribute('draggable') !== 'true'));
+  click(bar.querySelector('.bt-quick-filters-mode'));
+  await sleep(50);
+  // Each preset's two buttons turn into edit and remove, in the same places.
+  assert.equal(bar.querySelectorAll('.bt-quick-filter-choice.is-edit').length, 2);
+  assert.equal(bar.querySelectorAll('.bt-quick-filter-choice.is-delete').length, 2);
+  assert.equal(bar.querySelectorAll('.bt-quick-filter-choice.is-yes, .bt-quick-filter-choice.is-no').length, 0);
+  assert.ok([...bar.querySelectorAll('.bt-quick-filter')].every((chip) => chip.querySelectorAll('.bt-quick-filter-choice').length === 2));
+
+  // Edit mode: drag Quality onto Corrupted to put it first.
+  const drag = (name, chip) => chip.dispatchEvent(new window.Event(name, {bubbles: true, cancelable: true}));
+  const chips = () => [...bar.querySelectorAll('.bt-quick-filter')];
+  assert.ok(chips().every((chip) => chip.getAttribute('draggable') === 'true'));
+  drag('dragstart', chips()[1]);
+  await sleep(20);
+  drag('dragover', chips()[0]);
+  await sleep(20);
+  drag('drop', chips()[0]);
+  await sleep(100);
+  assert.deepEqual(store['quick-filters'].value.map((f) => f.label), ['Quality', 'Corrupted']);
+  assert.deepEqual(chips().map((chip) => chip.querySelector('.bt-quick-filter-label').textContent), ['Quality', 'Corrupted']);
+  // And back.
+  drag('dragstart', chips()[0]);
+  await sleep(20);
+  drag('dragover', chips()[1]);
+  await sleep(20);
+  drag('drop', chips()[1]);
+  await sleep(100);
+  assert.deepEqual(store['quick-filters'].value.map((f) => f.label), ['Corrupted', 'Quality']);
+
+  // Edit: Quality 20+ becomes "Good quality" 15–30, in the same place.
+  click(quality.querySelector('.bt-quick-filter-choice.is-edit'));
+  await sleep(100);
+  assert.ok(bar.querySelector('.bt-quick-filter-add').disabled, 'Add waits while editing');
+  assert.equal(bar.querySelector('.bt-quick-filter-pick').value, 'misc_filters.quality');
+  const [minBox, maxBox] = bar.querySelectorAll('.bt-quick-filter-number');
+  assert.equal(minBox.value, '20');
+  assert.equal(bar.querySelector('.bt-quick-filter-form-button.is-add').textContent.trim(), 'Save');
+  type(minBox, '15');
+  type(maxBox, '30');
+  type(bar.querySelector('.bt-quick-filter-name'), 'Good quality');
+  await sleep(30);
+  await submit();
+  assert.deepEqual(store['quick-filters'].value.map((f) => [f.label, f.value, f.valueText]), [
+    ['Corrupted', {}, 'Yes / No'],
+    ['Good quality', {min: 15, max: 30}, '15–30'],
+  ]);
+
+  // Remove one; and the setting turns the bar off.
+  click(corrupted().querySelector('.bt-quick-filter-choice.is-delete'));
+  await sleep(100);
+  assert.deepEqual(store['quick-filters'].value.map((f) => f.label), ['Good quality']);
+  click(tab(document, 'Settings'));
+  await sleep(50);
+  click([...document.querySelectorAll('.bt-settings .bt-form-checkbox')].find((b) => b.textContent.trim() === 'Quick filter presets'));
+  await sleep(100);
+  assert.equal(document.getElementById('bt-quick-filters'), null);
+});
+
+test('Live search: the trade site\'s own sound is the default; another sound chosen mutes it so only one plays', async () => {
+  const trade = (id, title, slug, sound) => ({id, title, completedAt: null, location: {version: '1', type: 'search', slug}, ...(sound ? {sound} : {})});
+  const setup = async (sound) => {
+    const loaded = await load({
+      path: '/trade/search/Standard/abc123/live',
+      stored: {
+        'bookmark-folders': {value: [{id: 'f1', title: 'Gear', version: '1', icon: null, archivedAt: null}], expiresAt: null},
+        'bookmark-trades--f1': {value: [trade('t1', 'Belt', 'abc123', sound)], expiresAt: null},
+      },
+    });
+    const {window, document} = loaded;
+    // The site's alert player, and a stand-in for actually playing.
+    let sitePlays = 0;
+    window.HTMLMediaElement.prototype.play = function () {
+      sitePlays++;
+      return Promise.resolve();
+    };
+    window.eval(readFileSync(new URL('../dist/chrome/page.js', import.meta.url), 'utf8'));
+    const player = document.createElement('audio');
+    player.src = 'https://web.poecdn.com/audio/trade/pulse.mp3';
+    document.body.appendChild(player);
+    await sleep(300);
+    return {...loaded, player, sitePlays: () => sitePlays};
+  };
+
+  // No sound picked anywhere: the site's sound plays, and the page says so.
+  const plain = await setup(null);
+  assert.match(plain.document.querySelector('.bt-live-alert-badge').textContent, /Live alert: Trade site’s sound/);
+  await plain.player.play();
+  assert.equal(plain.sitePlays(), 1);
+
+  // A bookmark with Ding: the site's sound is kept quiet.
+  const ding = await setup('ding');
+  assert.match(ding.document.querySelector('.bt-live-alert-badge').textContent, /Live alert: Ding/);
+  await ding.player.play();
+  assert.equal(ding.sitePlays(), 0);
+  // Other audio on the page is left alone.
+  const other = ding.document.createElement('audio');
+  other.src = 'https://example.com/music.mp3';
+  await other.play();
+  assert.equal(ding.sitePlays(), 1);
+});
+
+test('Quick filters: a set of stats under your own name; + puts them in Stat Filters, − takes them out; editable', async () => {
+  const STATS = {result: [
+    {id: 'pseudo', label: 'Pseudo', entries: [
+      {id: 'pseudo.pseudo_total_life', text: '+# total maximum Life'},
+      {id: 'pseudo.pseudo_total_elemental_resistance', text: '+#% total Elemental Resistance'},
+    ]},
+    {id: 'explicit', label: 'Explicit', entries: [{id: 'explicit.stat_3299347043', text: '+# to maximum Life'}]},
+  ]};
+  const {window, document, store} = await load({
+    onFetch: async (url) => (/\/api\/trade\/data\/stats$/.test(url) ? {ok: true, json: async () => STATS} : /\/data\/filters$/.test(url) ? {ok: true, json: async () => ({result: []})} : null),
+  });
+  window.app = {state: {filters: {}, stats: [{type: 'and', filters: [{id: 'explicit.stat_1', value: {min: 5}, disabled: false}]}, {type: 'not', filters: []}]}};
+  window.eval(readFileSync(new URL('../dist/chrome/page.js', import.meta.url), 'utf8'));
+  await sleep(100);
+  const bar = document.getElementById('bt-quick-filters');
+
+  click(bar.querySelector('.bt-quick-filter-add'));
+  await sleep(50);
+  click([...bar.querySelectorAll('.bt-quick-filter-kind')].find((b) => b.textContent.trim() === 'Stats'));
+  await sleep(100);
+  const query = () => bar.querySelector('.bt-quick-stat-query');
+  const matches = () => [...bar.querySelectorAll('.bt-quick-stat-match')].map((m) => m.textContent);
+
+  query().focus();
+  type(query(), 'total life');
+  await sleep(30);
+  assert.deepEqual(matches(), ['Pseudo+# total maximum Life']);
+  // Clicking elsewhere hides the list; back in the box, it shows again.
+  query().blur();
+  await sleep(30);
+  assert.deepEqual(matches(), []);
+  query().focus();
+  await sleep(30);
+  assert.deepEqual(matches(), ['Pseudo+# total maximum Life']);
+  click(bar.querySelector('.bt-quick-stat-match'));
+  await sleep(30);
+  query().focus();
+  type(query(), 'res');
+  await sleep(30);
+  click(bar.querySelector('.bt-quick-stat-match'));
+  await sleep(30);
+  assert.equal(bar.querySelectorAll('.bt-quick-stat-row').length, 2);
+  // The name starts as the first stat's; set your own and some mins.
+  assert.equal(bar.querySelector('.bt-quick-filter-name').value, 'total maximum Life');
+  type(bar.querySelector('.bt-quick-filter-name'), 'Res / Life');
+  const mins = bar.querySelectorAll('.bt-quick-stat-row .bt-quick-filter-number');
+  type(mins[0], '70');
+  type(mins[2], '80');
+  await sleep(30);
+  bar.querySelector('.bt-quick-filter-form').dispatchEvent(new window.Event('submit', {bubbles: true, cancelable: true}));
+  await sleep(100);
+  assert.deepEqual(store['quick-filters'].value.map((f) => [f.label, f.stats]), [
+    ['Res / Life', [
+      {id: 'pseudo.pseudo_total_life', text: '+# total maximum Life', min: 70},
+      {id: 'pseudo.pseudo_total_elemental_resistance', text: '+#% total Elemental Resistance', min: 80},
+    ]],
+  ]);
+
+  const chip = () => bar.querySelector('.bt-quick-filter');
+  const [minus, plus] = chip().querySelectorAll('.bt-quick-filter-choice');
+  assert.equal(minus.textContent.trim(), '−');
+  assert.equal(plus.textContent.trim(), '+');
+  const groups = () => JSON.parse(JSON.stringify(window.app.state.stats));
+
+  click(plus);
+  await sleep(100);
+  assert.deepEqual(groups()[0].filters, [
+    {id: 'explicit.stat_1', value: {min: 5}, disabled: false},
+    {id: 'pseudo.pseudo_total_life', value: {min: 70}, disabled: false},
+    {id: 'pseudo.pseudo_total_elemental_resistance', value: {min: 80}, disabled: false},
+  ], 'added to the main Stat Filters, next to what was there');
+  click(plus); // again: no duplicates
+  await sleep(100);
+  assert.equal(groups()[0].filters.length, 3);
+
+  click(minus);
+  await sleep(100);
+  assert.deepEqual(groups()[0].filters, [{id: 'explicit.stat_1', value: {min: 5}, disabled: false}], 'only its own stats are taken out');
+
+  // Edit: change a min and drop a stat.
+  click(bar.querySelector('.bt-quick-filters-mode'));
+  await sleep(50);
+  click(chip().querySelector('.bt-quick-filter-choice.is-edit'));
+  await sleep(100);
+  assert.equal(bar.querySelector('.bt-quick-filter-kinds'), null, 'editing keeps it a set of stats');
+  assert.equal(bar.querySelectorAll('.bt-quick-stat-row').length, 2);
+  type(bar.querySelectorAll('.bt-quick-stat-row .bt-quick-filter-number')[0], '90');
+  click(bar.querySelectorAll('.bt-quick-stat-row .bt-quick-filter-remove')[1]);
+  await sleep(30);
+  bar.querySelector('.bt-quick-filter-form').dispatchEvent(new window.Event('submit', {bubbles: true, cancelable: true}));
+  await sleep(100);
+  assert.deepEqual(store['quick-filters'].value[0].stats, [{id: 'pseudo.pseudo_total_life', text: '+# total maximum Life', min: 90}]);
+});
+
+test('the ⋯ menus close on a click elsewhere or Escape, and open again on one click', async () => {
+  const {document, window} = await load({
+    stored: {'bookmark-folders': {value: [{id: 'f1', title: 'Gear', version: '1', icon: null, archivedAt: null}], expiresAt: null}},
+  });
+  await sleep(100);
+  const opener = document.querySelector('.bt-folder-header .bt-contextual-menu');
+  const open = () => opener.dispatchEvent(new window.MouseEvent('click', {bubbles: true, clientX: 300, clientY: 100}));
+  const isOpen = () => Boolean(document.querySelector('.bt-contextual-menu-items'));
+
+  open();
+  await sleep(30);
+  assert.ok(isOpen());
+  document.querySelector('.resultset').dispatchEvent(new window.MouseEvent('mousedown', {bubbles: true}));
+  await sleep(30);
+  assert.ok(!isOpen(), 'a click elsewhere closes it');
+  open();
+  await sleep(30);
+  assert.ok(isOpen(), 'one click opens it again');
+  document.dispatchEvent(new window.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+  await sleep(30);
+  assert.ok(!isOpen(), 'Escape closes it');
+  // Clicking inside the menu doesn't close it before the item's own click.
+  open();
+  await sleep(30);
+  document.querySelector('.bt-contextual-menu-item').dispatchEvent(new window.MouseEvent('mousedown', {bubbles: true}));
+  await sleep(30);
+  assert.ok(isOpen());
 });

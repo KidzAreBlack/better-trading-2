@@ -313,6 +313,9 @@ const formatNumber = (value: number) => String(Math.round(value * 100) / 100);
 const closePopup = () => {
   const popup = document.getElementById(POPUP_ID);
   if (popup) popup.remove();
+  // However it closes (outside click, Escape, a tier picked), its T button is no longer "open",
+  // so the next click opens it again instead of counting as a close.
+  document.querySelectorAll(`.${BUTTON_CLASS}.is-open`).forEach((button) => button.classList.remove('is-open'));
 
   document.removeEventListener('mousedown', handleOutsideClick, true);
   document.removeEventListener('keydown', handleKeydown, true);
@@ -342,7 +345,6 @@ const openPopup = (button: HTMLElement, row: Element) => {
   const alreadyOpenForThisRow = button.classList.contains('is-open');
 
   closePopup();
-  document.querySelectorAll(`.${BUTTON_CLASS}.is-open`).forEach((other) => other.classList.remove('is-open'));
   if (alreadyOpenForThisRow) return;
 
   const statText = readStatText(row);

@@ -13,6 +13,7 @@
 import type {BookmarkFolder, BookmarkTrade} from './bookmarks';
 import {FOLDER_ICONS} from './bookmarks';
 import {sendMessage} from './ext';
+import {apiBase, pageFetch} from './trade-api';
 import type {TradeSiteVersion} from './trade-location';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -232,12 +233,6 @@ interface StatEntry {
   text: string;
 }
 type StatIndex = Map<string, Map<string, StatEntry[]>>; // group -> normalised text -> entries
-
-// The page's own fetch, so requests count as the trade site's (needed in Firefox).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const pageFetch: typeof fetch = (input, init) => ((globalThis as any).content?.fetch ?? fetch)(input, init);
-
-const apiBase = (version: TradeSiteVersion) => `https://www.pathofexile.com/api/${version === '2' ? 'trade2' : 'trade'}/data`;
 
 const loadStatIndex = async (version: TradeSiteVersion): Promise<StatIndex> => {
   const payload: Json = await (await pageFetch(`${apiBase(version)}/stats`)).json();

@@ -11,6 +11,7 @@ import setupBookmarkStats from './features/bookmark-stats';
 import setupFuzzySearch from './features/fuzzy-search';
 import setupLiveAlert from './features/live-alert';
 import setupPriceSummary from './features/price-summary';
+import setupQuickFilters from './features/quick-filters';
 import setupStickySearch from './features/sticky-search';
 import setupModFilter from './features/mod-filter';
 import setupTierPicker from './features/tier-picker';
@@ -46,6 +47,7 @@ const start = () => {
   setupPriceSummary();
   setupStickySearch();
   setupLiveAlert();
+  setupQuickFilters();
   setupPageTitle();
 
   watchLocation();

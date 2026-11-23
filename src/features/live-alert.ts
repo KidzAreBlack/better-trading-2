@@ -12,7 +12,11 @@ import {emit, on} from '../lib/util';
 const ROWS = '.resultset > div.row[data-id]';
 const BATCH_MS = 400;
 
-// Built-in sounds; your own are "custom:<id>". A bookmark can also be silent ("none").
+// "site" is the trade site's own live search sound (picked in the site's Settings): the
+// default, played by the site itself. Choosing any other sound mutes the site's one, so
+// only one plays. Built-in sounds; your own are "custom:<id>". A bookmark can also be
+// silent ("none").
+const SITE_SOUND = 'site';
 const BUILT_IN_SOUNDS = {chime: 'Chime', ding: 'Ding', beep: 'Beep'} as const;
 type BuiltIn = keyof typeof BUILT_IN_SOUNDS;
 export type SoundChoice = string;
@@ -76,19 +80,20 @@ export const removeCustomSound = async (id: string): Promise<void> => {
 
 // Every sound to pick from: built-in ones, then yours.
 export const listSounds = async (): Promise<{value: string; label: string}[]> => [
+  {value: SITE_SOUND, label: 'Trade site\u2019s sound'},
   ...Object.entries(BUILT_IN_SOUNDS).map(([value, label]) => ({value, label})),
   ...(await getCustomSounds()).map((sound) => ({value: `custom:${sound.id}`, label: sound.name})),
 ];
 
 const soundLabel = async (choice: string): Promise<string> =>
-  choice === NO_SOUND ? 'No sound' : (await listSounds()).find((sound) => sound.value === choice)?.label || BUILT_IN_SOUNDS.chime;
+  choice === NO_SOUND ? 'No sound' : (await listSounds()).find((sound) => sound.value === choice)?.label || 'Trade site\u2019s sound';
 
 // ---- Default sound and volume -------------------------------------------------------------
 
 export const getSoundChoice = (): SoundChoice => {
   const stored = local.get(CHOICE_KEY);
   if (stored === 'custom') return 'custom:first'; // the first version's single custom sound
-  return stored && (isBuiltIn(stored) || customId(stored)) ? stored : 'chime';
+  return stored && (stored === SITE_SOUND || isBuiltIn(stored) || customId(stored)) ? stored : SITE_SOUND;
 };
 
 export const setSoundChoice = (choice: SoundChoice): void => {
@@ -142,6 +147,11 @@ const TONES: Record<BuiltIn, {wave: OscillatorType; notes: [number, number, numb
 };
 
 export const playAlertSound = async (choice: SoundChoice = getSoundChoice(), volume = getVolume()): Promise<boolean> => {
+  if (choice === SITE_SOUND) {
+    // The site's own sound, as set in its Settings (for the Test buttons).
+    window.dispatchEvent(new CustomEvent('bt-site-sound', {detail: JSON.stringify({test: true})}));
+    return true;
+  }
   const ctx = audio();
   if (!ctx || volume <= 0 || choice === NO_SOUND) return false;
   if (ctx.state === 'suspended') await ctx.resume().catch(() => undefined);
@@ -236,13 +246,23 @@ const placeBadge = () => {
   if (badge.nextElementSibling !== anchor) anchor.before(badge);
 };
 
+// Mutes the site's own live search sound while another sound is chosen for this search.
+let siteMuted: boolean | null = null;
+const muteSiteSound = (muted: boolean) => {
+  if (siteMuted === muted) return;
+  siteMuted = muted;
+  window.dispatchEvent(new CustomEvent('bt-site-sound', {detail: JSON.stringify({muted})}));
+};
+
 const refreshBadge = async () => {
   if (!isActive() || !isEnabled('live-alert-sound')) {
+    muteSiteSound(false);
     badgeText = '';
     placeBadge();
     return;
   }
   const sound = await loadSearchSound();
+  muteSiteSound(sound.choice !== SITE_SOUND);
   const label = await soundLabel(sound.choice);
   badgeText = `\u{1F514} Live alert: ${label}${sound.bookmark ? ` (bookmark \u201C${sound.bookmark}\u201D)` : ' (default sound)'}`;
   placeBadge();
@@ -250,7 +270,8 @@ const refreshBadge = async () => {
 
 const alert = async (count: number, first: Element) => {
   const sound = await loadSearchSound();
-  if (isEnabled('live-alert-sound')) void playAlertSound(sound.choice);
+  // The site plays its own sound itself.
+  if (isEnabled('live-alert-sound') && sound.choice !== SITE_SOUND) void playAlertSound(sound.choice);
   // The desktop notification is for when you're looking at something else.
   if (isEnabled('live-alert-notification') && (document.hidden || !document.hasFocus())) {
     const what = count > 1 ? `${count} new items` : 'new item';
@@ -321,5 +342,10 @@ export default function setupLiveAlert() {
   };
   onPageChange(check);
   ['location-change', 'settings-change', 'bookmarks-change', 'live-alert-change'].forEach((event) => on(event, refresh));
+  // The page script may start after this one: tell it again whether to mute the site's sound.
+  window.addEventListener('bt-page-world-ready', () => {
+    siteMuted = null;
+    void refreshBadge();
+  });
   void refreshBadge();
 }

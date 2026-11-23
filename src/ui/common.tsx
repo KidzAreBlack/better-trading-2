@@ -269,9 +269,28 @@ export function ContextualMenu(props: {class?: string; items: MenuItem[]}) {
 
   useEffect(() => cancelHide, []);
 
+  // A click anywhere else, or Escape, closes it too (it otherwise closes once the mouse
+  // leaves it, which never happens if the mouse never went onto it).
+  const opener = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!position) return undefined;
+    const onMouseDown = (event: Event) => {
+      const target = event.target as Node | null;
+      if (target && (itemsElement.current?.contains(target) || opener.current?.contains(target))) return;
+      hide();
+    };
+    const onKeyDown = (event: KeyboardEvent) => event.key === 'Escape' && hide();
+    document.addEventListener('mousedown', onMouseDown, true);
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown, true);
+      document.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, [position]);
+
   return (
     <>
-      <div class={`bt-contextual-menu ${props.class || ''}`} onClick={(event) => setPosition({x: event.clientX, y: event.clientY})}>
+      <div ref={opener} class={`bt-contextual-menu ${props.class || ''}`} onClick={(event) => setPosition({x: event.clientX, y: event.clientY})}>
         <FaIcon icon="ellipsis-h" />
       </div>
 

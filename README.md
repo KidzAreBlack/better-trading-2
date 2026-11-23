@@ -34,10 +34,12 @@ single codebase. It keeps the original's look and adds a few search tools on top
   (click its heading to fold it) with each listing's price, what all their listings cost together, **Find**
   (jump to the listing) and **Buy** (presses the listing's own Travel to Hideout / Direct Whisper button).
   Sort by most listings, or by lowest or highest total price (mixed currencies compared with poe.ninja rates).
-- **Live search alerts**: a sound when a live search finds new items (Chime, Ding, Beep, or your own mp3 /
-  wav / ogg files up to 1 MB each, with a volume slider), and optionally a desktop notification while the
-  trade tab is in the background (click it to go back to the tab). Each bookmark can have its own sound (or
-  none), picked in its Edit window; a line above the live results shows which sound that search uses.
+- **Live search alerts**: the trade site already plays a sound for new live search items (picked in the
+  site's own Settings), and that stays the default. Pick another sound instead (Chime, Ding, Beep, or your own
+  mp3 / wav / ogg files up to 1 MB each, with a volume slider) and the site's sound is muted, so only one plays.
+  Each bookmark can have its own sound (or none) in its Edit window, and a line above the live results shows
+  which sound that search uses. Optionally, a desktop notification while the trade tab is in the background
+  (click it to go back to the tab).
 - **History** of the searches you run, shown as plain text, and **pinned items** for comparing results.
 - **Tabs**: choose which tabs the panel shows in Settings. Bookmarks, Bulk, History and Settings show by default;
   Pinned items is off until you turn it on.
@@ -50,6 +52,14 @@ single codebase. It keeps the original's look and adds a few search tools on top
 - **Settings tab** (each one can be turned on or off):
   - **Add fuzzy key to search**: adds `~` when you start typing in an empty main search box or stat filter box (or type over
     all of its text). Delete it and it stays deleted.
+  - **Quick filter presets**: a bar above Stat Filters with your own one-click filters. Click the **+** at the top
+    and pick any filter from the site's lists. A Yes / No filter (for example Miscellaneous > Corrupted) gets a
+    red ✗ (No) and a green ✓ (Yes); other filters keep the option or min / max you chose, with a green **+**
+    that sets it and a red **−** that clears it. Or choose **Stats** to save a set of stats under your own name
+    (type to find each stat, optional min / max): **+** puts them in the Stat Filters, **−** takes them out.
+    The pencil at the top turns on edit mode: each preset's two buttons become edit (pencil) and remove (×), in the
+    same places, and presets can be dragged to rearrange them;
+    (remove); click Done when finished.
   - **Tier search**: a **T** button on each stat filter that lists the mod's tiers for the selected Item
     Category and fills in the min value (PoE 1). With Item Category set to Any, it uses the item named in the
     main search box (a base type such as "Hubris Circlet", or a word like "ring").

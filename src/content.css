@@ -560,3 +560,64 @@ div.row[bt-regroup-state='visible'] { background: rgba(16, 16, 16, 0.8) !importa
    than the window, so it then gets its own scroll (up to 70% of the window). */
 body.bt-sticky-search #trade > .top { position: sticky; top: 0; z-index: 50; width: 100%; box-sizing: border-box; background: #080808; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6); }
 body.bt-sticky-search #trade > .top:not(:has(.search-advanced-hidden)) { max-height: 70vh; overflow-y: auto; overscroll-behavior: contain; }
+
+/* Quick filter presets (a bar above the site's Stat Filters) */
+#bt-quick-filters { margin: 0 0 10px; }
+.bt-quick-filters-box { padding: 8px 10px 10px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; background: rgba(0, 0, 0, 0.55); font-family: var(--bt-font); }
+.bt-quick-filters-header { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+.bt-quick-filters-title { font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--bt-gold-alt); }
+.bt-quick-filter-add { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-left: auto; padding: 0; border: 1px dashed rgba(255, 255, 255, 0.25); border-radius: 3px; background: none; font-size: 13px; line-height: 1; color: var(--bt-gold-alt); cursor: pointer; }
+.bt-quick-filter-add svg { display: block; } /* exactly centred: an inline icon sits on the text line, a bit low */
+.bt-quick-filter-add:hover { border-color: var(--bt-gold-alt); color: #fff; }
+.bt-quick-filter-add:disabled { opacity: 0.4; cursor: default; }
+.bt-quick-filters-mode { padding: 2px 8px; border: 1px solid transparent; border-radius: 3px; background: none; font-family: var(--bt-font); font-size: 12px; color: rgba(255, 255, 255, 0.4); cursor: pointer; }
+.bt-quick-filters-mode:hover { color: var(--bt-beige); }
+.bt-quick-filters-mode.is-on { border-color: var(--bt-gold-alt); color: #fff; }
+
+/* A preset: its name (and value), then two buttons: ✗ ✓ or − + (edit and remove in edit mode). */
+.bt-quick-filters-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.bt-quick-filter { display: inline-flex; align-items: center; gap: 4px; padding: 3px 3px 3px 8px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 3px; background: #111; }
+.bt-quick-filter-label { margin-right: 4px; font-size: 13px; color: var(--bt-beige); }
+.bt-quick-filter-value { margin-right: 4px; font-size: 12px; color: var(--bt-beige); }
+.bt-quick-filter-mark.is-yes { color: #8fd36a; }
+.bt-quick-filter-mark.is-no { color: #e06c5c; }
+.bt-quick-filter-choice { width: 26px; height: 24px; padding: 0; border: 1px solid transparent; border-radius: 3px; font-size: 14px; line-height: 1; color: #fff; cursor: pointer; }
+.bt-quick-filter-choice:active { border-color: #fff; }
+.bt-quick-filter-choice.is-no { background: #5c2420; }
+.bt-quick-filter-choice.is-no:hover { background: #73302a; }
+.bt-quick-filter-choice.is-yes { background: #2d4d22; }
+.bt-quick-filter-choice.is-yes:hover { background: #3a632c; }
+.bt-quick-filter-choice.is-edit,
+.bt-quick-filter-choice.is-delete { display: inline-flex; align-items: center; justify-content: center; background: #2a2a2a; font-size: 11px; color: rgba(255, 255, 255, 0.75); }
+.bt-quick-filter-choice.is-edit:hover { background: #3a3a3a; color: #fff; }
+.bt-quick-filter-choice.is-delete:hover { background: #73302a; color: #fff; }
+.bt-quick-filter.is-movable { cursor: grab; border-style: dashed; }
+.bt-quick-filter.is-dragged { opacity: 0.4; }
+.bt-quick-filter.is-drop-target { border-color: var(--bt-gold-alt); box-shadow: 0 0 0 1px var(--bt-gold-alt); }
+
+/* Adding or editing a preset: Filter or Stats */
+.bt-quick-filter-editor { margin-top: 8px; }
+.bt-quick-filter-kinds { display: flex; gap: 4px; margin-bottom: 6px; }
+.bt-quick-filter-kind { padding: 3px 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 3px; background: #151515; font-family: var(--bt-font); font-size: 13px; color: rgba(255, 255, 255, 0.6); cursor: pointer; }
+.bt-quick-filter-kind.is-current { border-color: var(--bt-gold-alt); color: #fff; }
+.bt-quick-filter-form { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.bt-quick-filter-input { height: 28px; padding: 0 6px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 3px; background: #0d0d0d; font-size: 13px; color: #fff; }
+.bt-quick-filter-pick { min-width: 200px; flex: 1 1 200px; }
+.bt-quick-filter-number { width: 60px; }
+.bt-quick-filter-name { width: 140px; }
+.bt-quick-filter-form-button { height: 28px; padding: 0 12px; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 3px; background: #222; font-family: var(--bt-font); font-size: 13px; color: var(--bt-beige); cursor: pointer; }
+.bt-quick-filter-form-button.is-add { border-color: #6b8f3a; background: #1f2b12; color: #fff; }
+.bt-quick-filter-form-button:disabled { opacity: 0.5; cursor: default; }
+.bt-quick-filter-form.is-stats { display: grid; }
+.bt-quick-stat-row { display: flex; align-items: center; gap: 6px; }
+.bt-quick-stat-text { flex: 1 1 auto; min-width: 0; font-size: 13px; color: #8888ff; }
+.bt-quick-stat-kind { margin-right: 6px; font-size: 11px; text-transform: uppercase; color: rgba(255, 255, 255, 0.45); }
+.bt-quick-filter-remove { align-self: stretch; padding: 0 6px; border: 0; background: none; font-size: 10px; color: rgba(255, 255, 255, 0.35); cursor: pointer; }
+.bt-quick-filter-remove:hover { color: #e06c5c; }
+.bt-quick-stat-search { position: relative; }
+.bt-quick-stat-query { width: 100%; box-sizing: border-box; }
+.bt-quick-stat-matches { position: absolute; z-index: 60; top: 100%; left: 0; right: 0; max-height: 260px; overflow-y: auto; border: 1px solid rgba(255, 255, 255, 0.2); background: #0d0d0d; }
+.bt-quick-stat-match { display: block; width: 100%; padding: 5px 8px; border: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); background: none; text-align: left; font-size: 13px; color: #c8c8ff; cursor: pointer; }
+.bt-quick-stat-match:hover { background: #1c1c2c; color: #fff; }
+.bt-quick-stat-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.bt-quick-stat-footer .bt-quick-filter-name { flex: 1 1 140px; }
