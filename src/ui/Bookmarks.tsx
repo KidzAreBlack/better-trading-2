@@ -18,6 +18,9 @@ import {AlertMessage, BookmarkFolderIcon, Button, ClipboardTextarea, ContextualM
 import {FaIcon} from './icons';
 import {ModFilter} from './ModFilter';
 
+// If the link can't be rewritten, it is saved as it is (with its trade mode) rather than not at all.
+const savedSlug = (slug: string): Promise<string> => withoutTradeMode(slug).catch(() => slug);
+
 const FOLDERS_WARNING_THRESHOLD = 10;
 
 interface FolderWithTrades {
@@ -212,6 +215,8 @@ export function Bookmarks() {
                 trades={trades}
                 league={location.league || (location.version === '2' ? 'poe2/Standard' : 'Standard')}
                 isExpanded={expandedIds.includes(folder.id as string)}
+                // Where a bookmark can be moved: the game's other folders, archived ones last.
+                moveTargets={[...active, ...archived].map((other) => other.folder).filter((other) => other.id !== folder.id)}
                 onEdit={() => setStagedFolder(folder)}
                 onReimport={entry.build ? () => setReimporting(entry) : undefined}
                 onExpansionToggle={() => toggleExpansion(folder.id as string)}
@@ -278,6 +283,7 @@ function Folder(props: {
   trades: BookmarkTrade[];
   league: string;
   isExpanded: boolean;
+  moveTargets: BookmarkFolder[];
   onEdit: () => void;
   onReimport?: () => void;
   onExpansionToggle: () => void;
@@ -303,7 +309,7 @@ function Folder(props: {
     if (!type || !slug) return;
 
     // Saved without the trade mode, so opening it later keeps whichever mode you are using.
-    setStagedTrade({title: recommendTitle(), completedAt: null, location: {version, type, slug: await withoutTradeMode(slug)}});
+    setStagedTrade({title: recommendTitle(), completedAt: null, location: {version, type, slug: await savedSlug(slug)}});
   };
 
   const persistTrade = async (trade: BookmarkTrade) => {
@@ -316,8 +322,16 @@ function Folder(props: {
     const {version, type, slug} = currentLocation();
     if (!type || !slug) return;
 
-    await bookmarks.saveTrade({...trade, location: {version, type, slug: await withoutTradeMode(slug)}}, folderId);
+    await bookmarks.saveTrade({...trade, location: {version, type, slug: await savedSlug(slug)}}, folderId);
     flash.success(`The trade location for "${trade.title}" has been updated.`);
+  };
+
+  // To the end of another folder. It keeps its id, so its sound and remembered prices go with it.
+  const moveTrade = async (trade: BookmarkTrade, target: BookmarkFolder) => {
+    const targetId = target.id as string;
+    await bookmarks.saveTrades([...(await bookmarks.fetchTrades(targetId)), trade], targetId);
+    await bookmarks.deleteTrade(trade.id as string, folderId);
+    flash.success(`"${trade.title}" has been moved to "${target.title}".`);
   };
 
   const deleteTrade = async (trade: BookmarkTrade) => {
@@ -398,6 +412,17 @@ function Folder(props: {
                           onClick: () => void bookmarks.saveTrade({...trade, completedAt: trade.completedAt ? null : new Date().toUTCString()}, folderId),
                         },
                         {label: 'Edit', onClick: () => setStagedTrade(trade)},
+                        ...(props.moveTargets.length
+                          ? [
+                              {
+                                label: 'Move to',
+                                items: props.moveTargets.map((target) => ({
+                                  label: target.archivedAt ? `${target.title} (archived)` : target.title,
+                                  onClick: () => void moveTrade(trade, target),
+                                })),
+                              },
+                            ]
+                          : []),
                         {label: 'Delete', onClick: () => setDeletingTrade(trade)},
                       ]}
                     />
@@ -695,10 +720,11 @@ function Backup() {
     const link = linkRef.current;
     if (!link) return;
 
-    link.href = URL.createObjectURL(new Blob([await bookmarks.generateBackup()], {type: 'text/plain'}));
+    // A data: link, not a blob: one: Firefox can start the download after the click returns,
+    // and a blob: link made here would already be gone (or not loadable by the page).
+    link.href = `data:text/plain;charset=utf-8,${encodeURIComponent(await bookmarks.generateBackup())}`;
     link.download = 'poe-better-trading-backup.txt';
     link.click();
-    URL.revokeObjectURL(link.href);
   };
 
   const restore = async (file: File) => {

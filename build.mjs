@@ -59,6 +59,18 @@ const manifests = {
   },
 };
 
+// Preact (the panel's UI library) writes to innerHTML only for dangerouslySetInnerHTML, which this
+// extension never uses. Writing text there instead keeps any HTML string from ever being parsed,
+// and keeps Firefox Add-ons' validator from flagging the line. Clearing (= "") works the same.
+const noInnerHtml = {
+  name: 'preact-no-inner-html',
+  setup: (b) =>
+    b.onLoad({filter: /[\\/]preact[\\/]dist[\\/][^\\/]+\.js$/}, (args) => {
+      const code = readFileSync(args.path, 'utf8');
+      return {contents: code.replace(/\.innerHTML=/g, '.textContent='), loader: 'js'};
+    }),
+};
+
 const options = (target) => ({
   entryPoints: {content: 'src/main.tsx', background: 'src/background.ts', page: 'src/page-world.ts'},
   outdir: `dist/${target}`,
@@ -70,6 +82,7 @@ const options = (target) => ({
   define: {__VERSION__: JSON.stringify(pkg.version)},
   minify: !watch, // small, fast-loading files for use; readable ones while developing
   logLevel: 'info',
+  plugins: [noInnerHtml],
 });
 
 const prepare = (target) => {
@@ -93,7 +106,7 @@ for (const target of Object.keys(manifests)) {
   if (watch) {
     const ctx = await context({
       ...options(target),
-      plugins: [{name: 'copy-css', setup: (b) => b.onEnd(() => writeCss(target))}],
+      plugins: [noInnerHtml, {name: 'copy-css', setup: (b) => b.onEnd(() => writeCss(target))}],
     });
     await ctx.watch();
   } else {

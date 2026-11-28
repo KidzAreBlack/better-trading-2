@@ -1,4 +1,4 @@
-import type {ComponentChildren} from 'preact';
+import {Fragment, type ComponentChildren} from 'preact';
 import {useEffect, useRef, useState} from 'preact/hooks';
 import {assetUrl} from '../lib/ext';
 import {FOLDER_ICONS} from '../lib/bookmarks';
@@ -245,6 +245,8 @@ export interface MenuItem {
   label: string;
   href?: string;
   onClick?: () => void;
+  // A list that opens inside the menu under this item (for example "Move to" and the folders).
+  items?: MenuItem[];
 }
 
 const HIDE_DELAY_MS = 500;
@@ -252,6 +254,7 @@ const HIDE_DELAY_MS = 500;
 export function ContextualMenu(props: {class?: string; items: MenuItem[]}) {
   const [position, setPosition] = useState<{x: number; y: number} | null>(null);
   const [top, setTop] = useState<number | null>(null);
+  const [openList, setOpenList] = useState<string | null>(null);
   const itemsElement = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<number>();
 
@@ -260,12 +263,14 @@ export function ContextualMenu(props: {class?: string; items: MenuItem[]}) {
     cancelHide();
     setPosition(null);
     setTop(null);
+    setOpenList(null);
   };
 
+  // Keep the whole menu on screen, also when a list opens inside it.
   useEffect(() => {
     if (!position || !itemsElement.current) return;
     setTop(position.y - Math.max(itemsElement.current.clientHeight + position.y - window.innerHeight, 0));
-  }, [position]);
+  }, [position, openList]);
 
   useEffect(() => cancelHide, []);
 
@@ -306,7 +311,32 @@ export function ContextualMenu(props: {class?: string; items: MenuItem[]}) {
           onMouseEnter={cancelHide}
         >
           {props.items.map((item) =>
-            item.href ? (
+            item.items ? (
+              <Fragment key={item.label}>
+                <button
+                  type="button"
+                  class={`bt-contextual-menu-item bt-contextual-menu-parent ${openList === item.label ? 'is-open' : ''}`}
+                  onClick={() => setOpenList(openList === item.label ? null : item.label)}
+                >
+                  {item.label}
+                  <FaIcon icon="chevron-down" class="bt-contextual-menu-parent-arrow" />
+                </button>
+                {openList === item.label &&
+                  item.items.map((child) => (
+                    <button
+                      key={child.label}
+                      type="button"
+                      class="bt-contextual-menu-item bt-contextual-menu-child"
+                      onClick={() => {
+                        child.onClick?.();
+                        hide();
+                      }}
+                    >
+                      {child.label}
+                    </button>
+                  ))}
+              </Fragment>
+            ) : item.href ? (
               <a key={item.label} href={item.href} class="bt-contextual-menu-item" onClick={hide}>
                 {item.label}
               </a>
@@ -373,7 +403,7 @@ export function useTradeModeSlugs(items: {key: string; slug: string; version: Tr
     let isCurrent = true;
     void (async () => {
       const next: Record<string, string> = {};
-      for (const item of items) next[item.key] = await withTradeMode(item.slug, currentTradeMode(item.version));
+      for (const item of items) next[item.key] = await withTradeMode(item.slug, currentTradeMode(item.version)).catch(() => item.slug);
       if (isCurrent) setResolved(next);
     })();
     return () => {

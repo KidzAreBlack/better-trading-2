@@ -11,16 +11,17 @@ single codebase. It keeps the original's look and adds a few search tools on top
 
 ## Features
 
-- **Bookmarks**: folders of saved searches, drag to reorder, archive, delete, export/share strings and a
-  backup file. Backup files and share strings from the original Better Trading import as-is. Bookmarks don't
+- **Bookmarks**: folders of saved searches, drag to reorder, move a bookmark to another folder (⋯ > Move to),
+  archive, delete, export/share strings and a backup file. Backup files and share strings from the original Better Trading import as-is. Bookmarks don't
   save the trade mode: they (and History links) open in whichever mode you're using, In Person or Instant Buyout.
 - **Price on bookmarks**: when you open a bookmarked search, its lowest price and how many listings it
   matched are remembered and shown under the bookmark (e.g. "12 c ▼ · 523 listings · 2 hours ago"), with
   ▼ / ▲ when the lowest price went down or up since the visit before. Mixed currencies are compared with
   poe.ninja rates (PoE 1). A setting, on by default.
-- **Automatic backup**: a few seconds after your bookmarks change, they're saved to
-  `Downloads/Better Trading 2/backup.txt` (one file, overwritten each time). Restore it with Backup tools >
-  Restore from file. Can be turned off in Settings.
+- **Automatic backup**: a few seconds after your bookmarks or Quick filter presets change, they're saved to
+  `Downloads/Better Trading 2/` as `firefox_backup.txt`, `chrome_backup.txt` and so on (one file per browser,
+  overwritten each time). Restore it with Backup tools >
+  Restore from file; presets you already have aren't added twice. Can be turned off in Settings.
 - **Add build**: paste a Path of Building code or a pobb.in link and get a bookmark folder with a trade search
   for every item the build wears (gear, flasks and jewels). If the build has several loadouts (Leveling,
   Endgame…), pick which one to use: its gear and the jewels in its own passive tree are searched. Uniques are searched by name plus the mods of the version the build uses (no values, so any roll
@@ -35,8 +36,9 @@ single codebase. It keeps the original's look and adds a few search tools on top
   (jump to the listing) and **Buy** (presses the listing's own Travel to Hideout / Direct Whisper button).
   Sort by most listings, or by lowest or highest total price (mixed currencies compared with poe.ninja rates).
 - **Live search alerts**: the trade site already plays a sound for new live search items (picked in the
-  site's own Settings), and that stays the default. Pick another sound instead (Chime, Ding, Beep, or your own
-  mp3 / wav / ogg files up to 1 MB each, with a volume slider) and the site's sound is muted, so only one plays.
+  site's own Settings), and that stays the default. Turn on **Live search custom sound** in Settings (off by
+  default) to pick another sound instead (Chime, Ding, Beep, or your own mp3 / wav / ogg files up to 1 MB each,
+  with a volume slider); the site's sound is then muted, so only one plays.
   Each bookmark can have its own sound (or none) in its Edit window, and a line above the live results shows
   which sound that search uses. Optionally, a desktop notification while the trade tab is in the background
   (click it to go back to the tab).
@@ -58,8 +60,7 @@ single codebase. It keeps the original's look and adds a few search tools on top
     that sets it and a red **−** that clears it. Or choose **Stats** to save a set of stats under your own name
     (type to find each stat, optional min / max): **+** puts them in the Stat Filters, **−** takes them out.
     The pencil at the top turns on edit mode: each preset's two buttons become edit (pencil) and remove (×), in the
-    same places, and presets can be dragged to rearrange them;
-    (remove); click Done when finished.
+    same places, and presets can be dragged to rearrange them. Click Done when finished.
   - **Tier search**: a **T** button on each stat filter that lists the mod's tiers for the selected Item
     Category and fills in the min value (PoE 1). With Item Category set to Any, it uses the item named in the
     main search box (a base type such as "Hubris Circlet", or a word like "ring").

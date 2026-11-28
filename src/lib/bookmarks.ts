@@ -1,4 +1,5 @@
 import {local, storage} from './ext';
+import {fetchQuickFilters, isQuickFilter, saveQuickFilters} from './quick-filter-store';
 import {searchKey} from './search-link';
 import {base64Decode, base64Encode, emit, uniqueId} from './util';
 import type {TradeSiteVersion} from './trade-location';
@@ -236,8 +237,11 @@ export const deserializeFolder = (serialized: string): [BookmarkFolder, Bookmark
 };
 
 // ---- Backup file of every folder (same file format as the original) -----------
+// Active folders, then archived ones, then (when there are any) your Quick filter presets.
+// Older versions read only the first two sections, so they still restore the bookmarks.
 
 const SECTION_DELIMITER = '\n--------------------\n';
+const QUICK_FILTERS_PREFIX = 'quick-filters:';
 
 export const generateBackup = async (): Promise<string> => {
   const active: string[] = [];
@@ -248,11 +252,36 @@ export const generateBackup = async (): Promise<string> => {
     (folder.archivedAt ? archived : active).push(serializeFolder(folder, await fetchTrades(folder.id)));
   }
 
-  return [active.join('\n'), archived.join('\n')].join(SECTION_DELIMITER);
+  const sections = [active.join('\n'), archived.join('\n')];
+  const quickFilters = await fetchQuickFilters();
+  if (quickFilters.length) sections.push(QUICK_FILTERS_PREFIX + base64Encode(JSON.stringify(quickFilters)));
+
+  return sections.join(SECTION_DELIMITER);
 };
 
+// A backup with no folders and no presets: only its dividers.
+export const isEmptyBackup = (text: string): boolean => !text.split(SECTION_DELIMITER).some((section) => section.trim());
+
+// Presets from the file are added after yours; one you already have (same preset) is skipped.
+const restoreQuickFilters = async (section: string): Promise<number> => {
+  const text = section.trim();
+  if (!text.startsWith(QUICK_FILTERS_PREFIX)) return 0;
+  try {
+    const parsed: unknown = JSON.parse(base64Decode(text.slice(QUICK_FILTERS_PREFIX.length)));
+    if (!Array.isArray(parsed)) return 0;
+    const current = await fetchQuickFilters();
+    const known = new Set(current.map((filter) => filter.id));
+    const added = parsed.filter(isQuickFilter).filter((filter) => !known.has(filter.id) && known.add(filter.id));
+    if (added.length) await saveQuickFilters([...current, ...added]);
+    return added.length;
+  } catch (_error) {
+    return 0;
+  }
+};
+
+// How many folders and presets were restored (0: the file had nothing to restore).
 export const restoreBackup = async (data: string): Promise<number> => {
-  const [activeSection = '', archivedSection = ''] = data.replace(/\r\n/g, '\n').split(SECTION_DELIMITER);
+  const [activeSection = '', archivedSection = '', quickFiltersSection = ''] = data.replace(/\r\n/g, '\n').split(SECTION_DELIMITER);
   let restored = 0;
 
   const restore = async (section: string, archivedAt: string | null) => {
@@ -269,6 +298,7 @@ export const restoreBackup = async (data: string): Promise<number> => {
 
   await restore(activeSection, null);
   await restore(archivedSection, new Date().toUTCString());
+  restored += await restoreQuickFilters(quickFiltersSection);
 
   return restored;
 };

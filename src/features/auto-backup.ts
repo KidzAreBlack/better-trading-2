@@ -1,8 +1,8 @@
-// Automatic bookmark backup: a few seconds after your bookmarks change, the same file the
-// Backup button makes is saved to Downloads/Better Trading 2/backup.txt (overwriting the
+// Automatic bookmark backup: a few seconds after your bookmarks (or Quick filter presets) change, the same file the
+// Backup button makes is saved to Downloads/Better Trading 2/<browser>_backup.txt (overwriting the
 // last one). The background script does the saving; nothing is saved when nothing changed.
 
-import {generateBackup} from '../lib/bookmarks';
+import {generateBackup, isEmptyBackup} from '../lib/bookmarks';
 import {local, sendMessage} from '../lib/ext';
 import {isEnabled} from '../lib/settings';
 import {emit, on} from '../lib/util';
@@ -38,6 +38,10 @@ const fingerprint = (text: string) => {
 
 const backUpNow = async (): Promise<boolean> => {
   const text = await generateBackup();
+  // Nothing to save (no bookmarks or presets here, or they couldn't be read): keep the last file
+  // rather than replace it with an empty one. Another browser or profile may share the same
+  // Downloads folder.
+  if (isEmptyBackup(text)) return true;
   const print = fingerprint(text);
   if (local.get(LAST_KEY) === print) return true;
 
@@ -61,6 +65,7 @@ export default function setupAutoBackup() {
   };
 
   on('bookmarks-change', schedule);
+  on('quick-filters-change', schedule);
   // Turning the setting on saves one right away (after the same short wait).
   on('settings-change', schedule);
 }

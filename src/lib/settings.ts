@@ -19,7 +19,7 @@ export const SETTINGS = {
   'regroup-similars': {label: 'Group identical listings from the same seller', defaultOn: true},
   'price-summary': {label: 'Price summary above the results (lowest / median / highest)', defaultOn: false},
   'mod-buttons': {label: 'Plus / Minus buttons on result mods', defaultOn: true},
-  'live-alert-sound': {label: 'Live search custom sound', defaultOn: true},
+  'live-alert-sound': {label: 'Live search custom sound', defaultOn: false},
   'live-alert-notification': {label: 'Live search desktop notification', defaultOn: false},
   // Which tabs the panel shows (Settings always shows).
   'tab-bookmarks': {label: 'Bookmarks', defaultOn: true},

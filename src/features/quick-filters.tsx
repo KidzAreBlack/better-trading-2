@@ -9,45 +9,17 @@
 
 import {render} from 'preact';
 import {useEffect, useState} from 'preact/hooks';
-import {storage} from '../lib/ext';
 import {onPageChange} from '../lib/page-watch';
+import {fetchQuickFilters, saveQuickFilters} from '../lib/quick-filter-store';
+import type {QuickFilter} from '../lib/quick-filter-store';
 import {isEnabled} from '../lib/settings';
 import {apiBase, pageFetch} from '../lib/trade-api';
 import {currentLocation, type TradeSiteVersion} from '../lib/trade-location';
-import {emit, on} from '../lib/util';
+import {on} from '../lib/util';
 import {flash} from '../ui/common';
 import {FaIcon} from '../ui/icons';
 
-const STORAGE_KEY = 'quick-filters';
 const BAR_ID = 'bt-quick-filters';
-
-export interface QuickFilter {
-  id: string;
-  version: TradeSiteVersion;
-  label: string;
-  group: string; // misc_filters
-  filter: string; // corrupted
-  value: {option?: string | null; min?: number; max?: number};
-  valueText: string; // "No", "80+", shown on the button
-  yesNo?: boolean; // a Yes / No filter: shown with its own ✗ (No) and ✓ (Yes) buttons
-  stats?: QuickStat[]; // a set of stats instead of a filter: shown with − and + buttons
-}
-
-export interface QuickStat {
-  id: string; // pseudo.pseudo_total_life
-  text: string; // +# total maximum Life
-  min?: number;
-  max?: number;
-}
-
-// ---- Saved quick filters -------------------------------------------------------------------
-
-const fetchQuickFilters = async (): Promise<QuickFilter[]> => (await storage.get<QuickFilter[]>(STORAGE_KEY)) || [];
-
-const saveQuickFilters = async (filters: QuickFilter[]) => {
-  await storage.set(STORAGE_KEY, filters);
-  emit('quick-filters-change');
-};
 
 // ---- The site's filter lists ---------------------------------------------------------------
 
@@ -225,6 +197,13 @@ function QuickFilterBar(props: {version: TradeSiteVersion}) {
     next.splice(to, 0, moving); // dragged forward it lands after the target, backward before it
     void saveQuickFilters(next);
   };
+  // The bar shows where the dragged preset will land: before the target when moved back, after it when moved forward.
+  const dropSide = (targetId: string): string => {
+    const from = filters.findIndex((filter) => filter.id === dragged);
+    const to = filters.findIndex((filter) => filter.id === targetId);
+    if (from < 0 || to < 0 || from === to) return '';
+    return from < to ? 'is-drop-after' : 'is-drop-before';
+  };
   const endDrag = () => {
     setDragged(null);
     setDropTarget(null);
@@ -255,7 +234,7 @@ function QuickFilterBar(props: {version: TradeSiteVersion}) {
         {shown.map((filter) => (
           <span
             key={filter.id}
-            class={`bt-quick-filter ${isEditMode ? 'is-movable' : ''} ${dragged === filter.id ? 'is-dragged' : ''} ${dropTarget === filter.id && dragged !== filter.id ? 'is-drop-target' : ''}`}
+            class={`bt-quick-filter ${isEditMode ? 'is-movable' : ''} ${dragged === filter.id ? 'is-dragged' : ''} ${dropTarget === filter.id ? dropSide(filter.id) : ''}`}
             draggable={isEditMode}
             title={isEditMode ? 'Drag to move' : undefined}
             onDragStart={(event) => {

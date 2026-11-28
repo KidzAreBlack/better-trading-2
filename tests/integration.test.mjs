@@ -526,21 +526,31 @@ test('bookmarks: create a folder, register the current trade, back up and restor
   // Opening a page is not a search: History stays empty.
   assert.equal(store['trade-history'], undefined);
 
-  // A backup file restores into a fresh browser.
-  const backup = await new Promise((resolve) => {
-    window.URL.createObjectURL = (blob) => {
-      const reader = new window.FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.readAsText(blob);
-
-      return 'blob:test';
+  // A backup file restores into a fresh browser, with your Quick filter presets.
+  const corrupted = {id: 'q1', version: '1', label: 'Corrupted', group: 'misc_filters', filter: 'corrupted', value: {option: 'false'}, valueText: 'No', yesNo: true};
+  const resLife = {id: 'q2', version: '1', label: 'Res / Life', group: '', filter: '', value: {}, valueText: '', stats: [{id: 'pseudo.pseudo_total_life', text: '+# total maximum Life', min: 70}]};
+  await window.chrome.storage.local.set({'quick-filters': {value: [corrupted, resLife], expiresAt: null}});
+  // The file is a data: link (Firefox may start the download after the click returns).
+  const saveFile = () => new Promise((resolve) => {
+    window.HTMLAnchorElement.prototype.click = function () {
+      assert.equal(this.download, 'poe-better-trading-backup.txt');
+      const prefix = 'data:text/plain;charset=utf-8,';
+      assert.ok(this.href.startsWith(prefix));
+      resolve(decodeURIComponent(this.href.slice(prefix.length)));
     };
-    window.URL.revokeObjectURL = () => {};
     click(button(document, 'Save file'));
   });
-  assert.match(backup, /^3:[A-Za-z0-9+/=]+\n-{20}\n$/);
+  const backup = await saveFile();
+  assert.match(backup, /^3:[A-Za-z0-9+/=_-]+\n-{20}\n\n-{20}\nquick-filters:[A-Za-z0-9+/=_-]+$/);
 
+  // Without presets, the file is exactly the original format.
+  await window.chrome.storage.local.set({'quick-filters': {value: [], expiresAt: null}});
+  assert.match(await saveFile(), /^3:[A-Za-z0-9+/=_-]+\n-{20}\n$/);
+
+  // Restoring adds the presets you don't already have, after yours.
+  const mine = {...corrupted, id: 'q9', label: 'Mine'};
   const fresh = await load();
+  await fresh.window.chrome.storage.local.set({'quick-filters': {value: [mine, resLife], expiresAt: null}});
   const fileInput = fresh.document.querySelector('input[type=file]');
   Object.defineProperty(fileInput, 'files', {value: [{text: async () => backup}], configurable: true});
   fileInput.dispatchEvent(new fresh.window.Event('change', {bubbles: true}));
@@ -548,6 +558,9 @@ test('bookmarks: create a folder, register the current trade, back up and restor
   assert.equal(fresh.store['bookmark-folders'].value[0].title, 'My build');
   const restoredId = fresh.store['bookmark-folders'].value[0].id;
   assert.equal(fresh.store[`bookmark-trades--${restoredId}`].value[0].title, 'Staff');
+  assert.deepEqual(fresh.store['quick-filters'].value.map((filter) => filter.label), ['Mine', 'Res / Life', 'Corrupted']);
+  assert.deepEqual(fresh.store['quick-filters'].value[2], corrupted);
+  assert.equal(fresh.document.querySelector('.bt-flash-messages')?.textContent.includes('failed') ?? false, false);
 });
 
 test('a folder can be deleted, with its bookmarks, from its menu', async () => {
@@ -911,6 +924,42 @@ test('bookmarks are saved without the trade mode and open in the mode you are us
   const saved = store['bookmark-trades--f1'].value.find((t) => t.id !== 't1');
   assert.deepEqual(decodeSlug(saved.location.slug), LIFE_SEARCH);
   void store;
+});
+
+test('Register current trade works in Firefox, where streams cannot go through Blob or Response', async () => {
+  const instantSlug = makeSlug({status: {option: 'securable'}, ...LIFE_SEARCH});
+  const {document, window, store} = await load({path: `/trade/search/Standard/${instantSlug}`, nodeStreams: true});
+  await window.chrome.storage.local.set({
+    'bookmark-folders': {value: [{id: 'f1', title: 'My build', version: '1', icon: null, archivedAt: null}], expiresAt: null},
+  });
+  window.localStorage.setItem('bt-bookmark-folders-expansion', 'f1');
+  const broken = class {
+    constructor() {
+      throw new TypeError('not available in this content script');
+    }
+  };
+  Object.assign(window, {Blob: broken, Response: broken});
+  window.dispatchEvent(new window.Event('focus'));
+  click(tab(document, 'History'));
+  await sleep(50);
+  click(tab(document, 'Bookmarks'));
+  await sleep(200);
+
+  const register = async () => {
+    click(button(document, 'Register current trade'));
+    await sleep(150);
+    const form = document.querySelector('.bt-modal-container form');
+    assert.ok(form, 'the new bookmark form opens');
+    form.dispatchEvent(new window.Event('submit', {bubbles: true, cancelable: true}));
+    await sleep(150);
+    return store['bookmark-trades--f1'].value.at(-1);
+  };
+  // Saved without its trade mode.
+  assert.deepEqual(decodeSlug((await register()).location.slug), LIFE_SEARCH);
+
+  // If the link can't be rewritten at all, it is still saved, as it is.
+  window.CompressionStream = broken;
+  assert.equal((await register()).location.slug, instantSlug);
 });
 
 test('Plus and Minus on result mods add the mod to an And group and a Not group', async () => {
@@ -1324,6 +1373,32 @@ test('bookmarks are backed up to a file automatically after they change', async 
   window.close();
 });
 
+test('auto backup never replaces the file with an empty one', async () => {
+  const saved = [];
+  const {document, window, store} = await load({onMessage: (message) => (message.query === 'backup-file' ? (saved.push(message.text), true) : null)});
+  // No bookmarks or presets here (say, another browser sharing the Downloads folder):
+  // turning the setting off and on saves nothing.
+  window.localStorage.setItem('bt-setting-auto-backup', 'off');
+  window.dispatchEvent(new window.StorageEvent('storage', {key: 'bt-setting-auto-backup'}));
+  window.localStorage.setItem('bt-setting-auto-backup', 'on');
+  window.dispatchEvent(new window.StorageEvent('storage', {key: 'bt-setting-auto-backup'}));
+  await sleep(5300);
+  assert.equal(saved.length, 0);
+  assert.equal(document.querySelector('.bt-backup-status').textContent, 'Auto backup saves a few seconds after your bookmarks change.');
+
+  // Deleting the last folder keeps the last file too.
+  await window.chrome.storage.local.set({'bookmark-folders': {value: [{id: 'f1', title: 'Only', version: '1', icon: null, archivedAt: null}], expiresAt: null}});
+  window.dispatchEvent(new window.StorageEvent('storage', {key: 'bt-setting-auto-backup'}));
+  await sleep(5300);
+  assert.equal(saved.length, 1);
+  await window.chrome.storage.local.set({'bookmark-folders': {value: [], expiresAt: null}});
+  window.dispatchEvent(new window.StorageEvent('storage', {key: 'bt-setting-auto-backup'}));
+  await sleep(5300);
+  assert.equal(saved.length, 1);
+  assert.ok(store);
+  window.close();
+});
+
 test('price summary: lowest, median and highest of the loaded results, in Chaos / Divines', async () => {
   const ninja = {lines: [{id: 'chaos', primaryValue: 1}, {id: 'divine', primaryValue: 150}], items: [{id: 'chaos', name: 'Chaos Orb'}, {id: 'divine', name: 'Divine Orb'}]};
   const {window, document} = await load({settings: ['tier-search', 'advanced-filtering', 'price-summary'], onMessage: (message) => (message.query === 'poe-ninja' ? ninja : null)});
@@ -1517,7 +1592,7 @@ test('Re-import build: a build folder can be made again from its source, keeping
 
 test('Live search: new items above the shown ones play the sound once per batch, and notify in the background', async () => {
   const messages = [];
-  const {document, window} = await load({path: '/trade/search/Standard/abc123/live', settings: ['live-alert-notification'], local: {'bt-live-alert-sound-choice': 'chime'}, onMessage: (m) => (messages.push(m), true)});
+  const {document, window} = await load({path: '/trade/search/Standard/abc123/live', settings: ['live-alert-sound', 'live-alert-notification'], local: {'bt-live-alert-sound-choice': 'chime'}, onMessage: (m) => (messages.push(m), true)});
   // A stand-in for the browser's audio: counts the sounds started.
   let played = 0;
   class FakeAudio {
@@ -1577,7 +1652,7 @@ test('Live search: a bookmarked search plays the sound picked on its bookmark', 
   const trade = (id, title, slug, sound) => ({id, title, completedAt: null, location: {version: '1', type: 'search', slug}, ...(sound ? {sound} : {})});
   const {document, window, store} = await load({
     path: '/trade/search/Standard/abc123/live',
-    settings: ['live-alert-notification'],
+    settings: ['live-alert-sound', 'live-alert-notification'],
     onMessage: (m) => (messages.push(m), true),
     stored: {
       'bookmark-folders': {value: [{id: 'f1', title: 'Gear', version: '1', icon: null, archivedAt: null}], expiresAt: null},
@@ -1837,6 +1912,9 @@ test('Quick filters: a Yes / No filter gets ✗ and ✓ buttons, other filters t
   await sleep(20);
   drag('dragover', chips()[0]);
   await sleep(20);
+  // One bar, on the side it will land: before Corrupted.
+  assert.ok(chips()[0].classList.contains('is-drop-before'));
+  assert.equal(bar.querySelectorAll('.is-drop-before, .is-drop-after').length, 1);
   drag('drop', chips()[0]);
   await sleep(100);
   assert.deepEqual(store['quick-filters'].value.map((f) => f.label), ['Quality', 'Corrupted']);
@@ -1846,6 +1924,8 @@ test('Quick filters: a Yes / No filter gets ✗ and ✓ buttons, other filters t
   await sleep(20);
   drag('dragover', chips()[1]);
   await sleep(20);
+  assert.ok(chips()[1].classList.contains('is-drop-after'));
+  assert.equal(bar.querySelectorAll('.is-drop-before, .is-drop-after').length, 1);
   drag('drop', chips()[1]);
   await sleep(100);
   assert.deepEqual(store['quick-filters'].value.map((f) => f.label), ['Corrupted', 'Quality']);
@@ -1881,9 +1961,10 @@ test('Quick filters: a Yes / No filter gets ✗ and ✓ buttons, other filters t
 
 test('Live search: the trade site\'s own sound is the default; another sound chosen mutes it so only one plays', async () => {
   const trade = (id, title, slug, sound) => ({id, title, completedAt: null, location: {version: '1', type: 'search', slug}, ...(sound ? {sound} : {})});
-  const setup = async (sound) => {
+  const setup = async (sound, settings = ['live-alert-sound']) => {
     const loaded = await load({
       path: '/trade/search/Standard/abc123/live',
+      settings,
       stored: {
         'bookmark-folders': {value: [{id: 'f1', title: 'Gear', version: '1', icon: null, archivedAt: null}], expiresAt: null},
         'bookmark-trades--f1': {value: [trade('t1', 'Belt', 'abc123', sound)], expiresAt: null},
@@ -1920,6 +2001,13 @@ test('Live search: the trade site\'s own sound is the default; another sound cho
   other.src = 'https://example.com/music.mp3';
   await other.play();
   assert.equal(ding.sitePlays(), 1);
+
+  // "Live search custom sound" is off by default: the extension leaves the site's sound alone,
+  // even on a bookmark with its own sound.
+  const off = await setup('ding', []);
+  assert.equal(off.document.querySelector('.bt-live-alert-badge'), null);
+  await off.player.play();
+  assert.equal(off.sitePlays(), 1);
 });
 
 test('Quick filters: a set of stats under your own name; + puts them in Stat Filters, − takes them out; editable', async () => {
@@ -2043,4 +2131,55 @@ test('the ⋯ menus close on a click elsewhere or Escape, and open again on one 
   document.querySelector('.bt-contextual-menu-item').dispatchEvent(new window.MouseEvent('mousedown', {bubbles: true}));
   await sleep(30);
   assert.ok(isOpen());
+});
+
+test('a bookmark can be moved to another folder from its ⋯ menu (Move to + the folder list)', async () => {
+  const trade = (id, title) => ({id, title, completedAt: null, location: {version: '1', type: 'search', slug: id}, sound: id === 't1' ? 'ding' : undefined});
+  const {document, window, store} = await load({
+    stored: {
+      'bookmark-folders': {value: [
+        {id: 'f1', title: 'Gear', version: '1', icon: null, archivedAt: null},
+        {id: 'f2', title: 'Maps', version: '1', icon: null, archivedAt: null},
+        {id: 'f3', title: 'Old', version: '1', icon: null, archivedAt: 'Mon, 01 Jan 2024 00:00:00 GMT'},
+        {id: 'f4', title: 'PoE 2 stuff', version: '2', icon: null, archivedAt: null},
+      ], expiresAt: null},
+      'bookmark-trades--f1': {value: [trade('t1', 'Belt'), trade('t2', 'Ring')], expiresAt: null},
+      'bookmark-trades--f2': {value: [trade('t3', 'Map')], expiresAt: null},
+    },
+  });
+  await sleep(100);
+  if (!document.querySelector('.bt-folder-trade')) click(document.querySelector('.bt-folder-header-label'));
+  await sleep(50);
+  document.querySelector('.bt-folder-trade-actions .bt-contextual-menu').dispatchEvent(new window.MouseEvent('click', {bubbles: true, clientX: 300, clientY: 100}));
+  await sleep(50);
+  const items = () => [...document.querySelectorAll('.bt-contextual-menu-item')].map((item) => item.textContent.trim());
+  assert.ok(items().includes('Move to'));
+  assert.ok(!items().includes('Maps'), 'the folders only show once Move to is opened');
+
+  click([...document.querySelectorAll('.bt-contextual-menu-item')].find((item) => item.textContent.trim() === 'Move to'));
+  await sleep(50);
+  // The same game's other folders, archived ones last; not the folder it's in.
+  assert.deepEqual([...document.querySelectorAll('.bt-contextual-menu-child')].map((item) => item.textContent.trim()), ['Maps', 'Old (archived)']);
+
+  click([...document.querySelectorAll('.bt-contextual-menu-child')].find((item) => item.textContent.trim() === 'Maps'));
+  await sleep(150);
+  assert.deepEqual(store['bookmark-trades--f1'].value.map((t) => t.title), ['Ring']);
+  assert.deepEqual(store['bookmark-trades--f2'].value.map((t) => [t.id, t.title, t.sound]), [['t3', 'Map', undefined], ['t1', 'Belt', 'ding']], 'added at the end, same id and sound');
+  assert.equal(document.querySelector('.bt-contextual-menu-items'), null, 'the menu closes');
+});
+
+test('Price on bookmarks: an Add build search still matches after the site trims its empty "value": {} and "disabled": false', async () => {
+  const slugOf = (query) => gzipSync(Buffer.from(JSON.stringify(query))).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const saved = slugOf({name: "Ralakesh's Impatience", type: 'Riveted Boots', stats: [{type: 'and', filters: []}, {filters: [{id: 'explicit.stat_1', value: {}, disabled: false}, {id: 'explicit.stat_2', value: {min: 5}, disabled: true}], type: 'and'}]});
+  const onPage = slugOf({status: {option: 'securable'}, name: "Ralakesh's Impatience", type: 'Riveted Boots', stats: [{type: 'and', filters: []}, {type: 'and', filters: [{id: 'explicit.stat_1'}, {id: 'explicit.stat_2', value: {min: 5}, disabled: true}]}]});
+  const {store} = await load({
+    path: `/trade/search/Standard/${onPage}`,
+    nodeStreams: true,
+    stored: {
+      'bookmark-folders': {value: [{id: 'f1', title: 'Gear', version: '1', icon: null, archivedAt: null}], expiresAt: null},
+      'bookmark-trades--f1': {value: [{id: 't1', title: 'Boots', completedAt: null, location: {version: '1', type: 'search', slug: saved}}], expiresAt: null},
+    },
+  });
+  await sleep(2000);
+  assert.ok(store['bookmark-stats']?.value.t1, 'the visit is saved on the bookmark');
 });

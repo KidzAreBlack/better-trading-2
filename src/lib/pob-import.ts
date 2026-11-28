@@ -10,6 +10,7 @@
 // - The trade site now stores a whole search inside its links (gzip + base64url of the
 //   search JSON), so each search link is built right here: no searches are sent to the
 //   trade site and the rate limit is never touched.
+import {transform} from './compress';
 import type {BookmarkFolder, BookmarkTrade} from './bookmarks';
 import {FOLDER_ICONS} from './bookmarks';
 import {sendMessage} from './ext';
@@ -31,9 +32,6 @@ const encodeBase64Url = (bytes: Uint8Array): string => {
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
-
-const transform = async (bytes: Uint8Array, stream: CompressionStream | DecompressionStream): Promise<Uint8Array> =>
-  new Uint8Array(await new Response(new Blob([bytes as BlobPart]).stream().pipeThrough(stream)).arrayBuffer());
 
 const POBB_LINK = /pobb\.in\/(?:u\/[^/\s]+\/)?([A-Za-z0-9_-]{6,})/;
 

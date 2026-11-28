@@ -2,6 +2,7 @@
 // search JSON), including the trade mode ("status": In Person, Instant Buyout, Any...).
 // Saved links should not force a mode: bookmarks are saved without it, and when a bookmark or
 // history link is opened, the mode you are currently using is put in.
+import {transform} from './compress';
 import {local} from './ext';
 import {currentLocation} from './trade-location';
 import type {TradeSiteVersion} from './trade-location';
@@ -9,9 +10,6 @@ import {emit, on} from './util';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Json = Record<string, any>;
-
-const transform = async (bytes: Uint8Array, stream: CompressionStream | DecompressionStream): Promise<Uint8Array> =>
-  new Uint8Array(await new Response(new Blob([bytes as BlobPart]).stream().pipeThrough(stream)).arrayBuffer());
 
 // Only links that carry their search can be read; old short search ids cannot.
 const isSelfContained = (slug: string): boolean => slug.startsWith('H4sI');
@@ -52,11 +50,17 @@ export const withTradeMode = async (slug: string, mode: string | null): Promise<
 };
 
 // Identifies a search regardless of its trade mode, for "is this the same search?" checks.
-// The same search can be written with its keys in another order.
+// The same search can be written with its keys in another order, and the site trims what it
+// opens: a stat's empty "value": {} and "disabled": false are left out. So those defaults (and
+// nulls) don't count.
 const canonical = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value && typeof value === 'object') {
-    const entries = Object.keys(value as Json).sort().map((key) => `${JSON.stringify(key)}:${canonical((value as Json)[key])}`);
+    const entries = Object.keys(value as Json)
+      .sort()
+      .map((key) => [key, (value as Json)[key], canonical((value as Json)[key])] as const)
+      .filter(([key, item, text]) => item !== null && item !== undefined && !(key === 'disabled' && item === false) && text !== '{}')
+      .map(([key, , text]) => `${JSON.stringify(key)}:${text}`);
     return `{${entries.join(',')}}`;
   }
   return JSON.stringify(value);

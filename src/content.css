@@ -199,8 +199,8 @@ body.bt-is-collapsed.bt-is-peeking .bt-header-expand-button.is-visible { opacity
 .bt-form-field-helper { margin: 5px 0 0; font-size: 12px; font-weight: normal; color: rgba(255, 248, 225, 0.8); }
 .bt-form-input { width: 100%; max-width: 400px; height: 30px; padding: 0 10px; border: 0; background-color: #1e2124; outline: none; font-weight: normal; color: var(--bt-white); }
 .bt-form-checkbox { display: flex; align-items: center; cursor: pointer; }
-.bt-form-checkbox-indicator { position: relative; width: 15px; height: 15px; border: 2px solid #634928; margin-right: 5px; }
-.bt-form-checkbox-indicator::before { display: block; content: ''; position: absolute; top: 2px; left: 2px; transform: scale(0); width: 7px; height: 7px; background-color: var(--bt-white); transition: transform 0.2s ease; }
+.bt-form-checkbox-indicator { position: relative; flex-shrink: 0; width: 15px; height: 15px; border: 2px solid #634928; margin-right: 5px; } /* keeps its size when a long label wraps */
+.bt-form-checkbox-indicator::before { display: block; content: ''; position: absolute; inset: 0; margin: auto; transform: scale(0); width: 7px; height: 7px; background-color: var(--bt-white); transition: transform 0.2s ease; }
 .bt-form-checkbox-indicator.is-active::before { transform: scale(1); }
 .bt-form-checkbox-label { font-family: var(--bt-font); font-size: 13px; line-height: 1; color: var(--bt-white); }
 .bt-clipboard-textarea-wrapper { position: relative; }
@@ -228,6 +228,11 @@ body.bt-is-collapsed.bt-is-peeking .bt-header-expand-button.is-visible { opacity
   transition-property: color, padding;
 }
 .bt-contextual-menu-item:hover, .bt-contextual-menu-item:focus { text-decoration: none; }
+/* "Move to": its folders open underneath it, indented. */
+.bt-contextual-menu-parent { display: flex; align-items: center; justify-content: space-between; }
+.bt-contextual-menu-parent-arrow { font-size: 10px; transition: transform 0.2s ease; transform: rotate(-90deg); }
+.bt-contextual-menu-parent.is-open .bt-contextual-menu-parent-arrow { transform: none; }
+.bt-contextual-menu-child { padding-left: 24px !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bt-contextual-menu-item::before, .bt-folder-trade-link::before, .bt-history-entry-link::before {
   content: '';
   position: absolute;
@@ -593,7 +598,12 @@ body.bt-sticky-search #trade > .top:not(:has(.search-advanced-hidden)) { max-hei
 .bt-quick-filter-choice.is-delete:hover { background: #73302a; color: #fff; }
 .bt-quick-filter.is-movable { cursor: grab; border-style: dashed; }
 .bt-quick-filter.is-dragged { opacity: 0.4; }
-.bt-quick-filter.is-drop-target { border-color: var(--bt-gold-alt); box-shadow: 0 0 0 1px var(--bt-gold-alt); }
+/* Where a dragged preset will land: a bar in the gap before or after the preset under it. */
+.bt-quick-filter.is-movable { position: relative; }
+.bt-quick-filter.is-drop-before::before,
+.bt-quick-filter.is-drop-after::after { content: ''; position: absolute; top: -2px; bottom: -2px; width: 2px; border-radius: 1px; background: var(--bt-gold-alt); pointer-events: none; }
+.bt-quick-filter.is-drop-before::before { left: -5px; }
+.bt-quick-filter.is-drop-after::after { right: -5px; }
 
 /* Adding or editing a preset: Filter or Stats */
 .bt-quick-filter-editor { margin-top: 8px; }
